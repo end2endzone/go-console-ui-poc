@@ -9,26 +9,48 @@ import (
 )
 
 type Book struct {
-	Title  string
-	Author string
-	Year   string
-	Desc   string
+	Title       string
+	Author      string
+	Year        int
+	Description string
 }
 
 type model struct {
-	books  []Book
-	cursor int
+	books    []Book
+	cursor   int
+	selected int
 }
 
 func initialModel() model {
 	return model{
 		books: []Book{
-			{Title: "The Go Programming Language", Author: "Alan A. A. Donovan", Year: "2015", Desc: "An authoritative guide to writing clear, idiomatic Go program code."},
-			{Title: "Concurrency in Go", Author: "Katherine Cox-Buday", Year: "2017", Desc: "Deep dive into concurrency patterns, primitives, and memory access in Go."},
-			{Title: "Designing Data-Intensive Applications", Author: "Martin Kleppmann", Year: "2017", Desc: "A comprehensive guide to data system architectures, scalability, and reliability."},
-			{Title: "Clean Code", Author: "Robert C. Martin", Year: "2008", Desc: "A handbook of agile software craftsmanship focused on writing readable, maintainable code."},
+			{
+				Title:       "The Go Programming Language",
+				Author:      "Alan A. A. Donovan & Brian W. Kernighan",
+				Year:        2015,
+				Description: "The authoritative resource for learning the Go programming language.",
+			},
+			{
+				Title:       "Concurrency in Go",
+				Author:      "Katherine Cox-Buday",
+				Year:        2017,
+				Description: "Tools and techniques for developers looking to master concurrent code.",
+			},
+			{
+				Title:       "Learning Go",
+				Author:      "Jon Bodner",
+				Year:        2021,
+				Description: "An idiomatic guide to real-world Go programming.",
+			},
+			{
+				Title:       "Go in Action",
+				Author:      "William Kennedy",
+				Year:        2015,
+				Description: "An introduction to Go focusing on practical application development.",
+			},
 		},
-		cursor: 0,
+		cursor:   0,
+		selected: 0,
 	}
 }
 
@@ -40,7 +62,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "up", "k":
 			if m.cursor > 0 {
@@ -56,51 +78,59 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	// Column Styles
+	// Styles
 	leftStyle := lipgloss.NewStyle().
-		Width(35).
-		Height(10).
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
-		Padding(0, 1)
+		Width(30).
+		Height(12).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1)
 
 	rightStyle := lipgloss.NewStyle().
 		Width(45).
-		Height(10).
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1)
+		Height(12).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1)
 
-	// Build Left Column (Book Titles)
-	leftContent := "SELECT A BOOK:\n\n"
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("205")).
+		MarginBottom(1)
+
+	cursorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+
+	// Left Column: Book List
+	leftContent := lipgloss.NewStyle().Bold(true).Render("Books") + "\n\n"
 	for i, book := range m.books {
-		cursor := " "
+		cursor := "  "
+		item := book.Title
+
 		if m.cursor == i {
-			cursor = ">"
-			leftContent += fmt.Sprintf("[%s] %s\n", cursor, lipgloss.NewStyle().Bold(true).Render(book.Title))
-		} else {
-			leftContent += fmt.Sprintf(" %s  %s\n", cursor, book.Title)
+			cursor = "> "
+			item = cursorStyle.Render(book.Title)
 		}
+		leftContent += fmt.Sprintf("%s%s\n", cursor, item)
 	}
 
-	// Build Right Column (Selected Details)
-	selected := m.books[m.cursor]
-	rightContent := fmt.Sprintf(
-		"DETAILS:\n\nTitle:  %s\nAuthor: %s\nYear:   %s\n\n%s",
-		selected.Title,
-		selected.Author,
-		selected.Year,
-		selected.Desc,
-	)
+	// Right Column: Book Details
+	selectedBook := m.books[m.cursor]
+	rightContent := titleStyle.Render(selectedBook.Title) + "\n" +
+		fmt.Sprintf("Author: %s\n", selectedBook.Author) +
+		fmt.Sprintf("Year:   %d\n\n", selectedBook.Year) +
+		fmt.Sprintf("Details: %s\n", selectedBook.Description)
 
-	// Join both columns side-by-side horizontally
-	view := lipgloss.JoinHorizontal(
+	// Join both columns horizontally
+	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftStyle.Render(leftContent),
 		rightStyle.Render(rightContent),
 	)
 
-	return view + "\n\nPress 'q' or 'Ctrl+C' to exit. Use ↑/↓ to navigate."
+	helpText := "\n Use ↑/↓ or j/k to navigate • Press 'q' to exit"
+	return columns + helpText + "\n"
 }
 
 func main() {
