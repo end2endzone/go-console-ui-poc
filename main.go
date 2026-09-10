@@ -16,14 +16,17 @@ type Book struct {
 	Description string
 }
 
+// Force model to always implements interface tea.Model
+var _ tea.Model = (*model)(nil)
+
 type model struct {
-	allBooks     []Book
-	filtered     []Book
-	cursor       int // Selected index in `filtered`
-	scrollOffset int // For list scrolling window
-	searchQuery  string
-	searching    bool
-	selectedBook *Book
+	allBooks     []Book // These are the Books raw data. This slice is never rendered in the UI.
+	filtered     []Book // These are the Books that are rendered. Even when we do not filter, we copy allBooks to filtered. See `applyFilter()` for details.
+	cursor       int    // Selected Book index in `filtered` list.
+	scrollOffset int    // For list scrolling window
+	searchQuery  string //
+	searching    bool   // Searching mode. When disabled, show "text to explain how to trigger the search mode". When enabled, show the actual text filter.
+	selectedBook *Book  // Selected Book when user presses ENTER
 	width        int
 	height       int
 }
@@ -144,6 +147,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// getVisibleListHeight returns the number of books that must be displayed in the left panel.
+// This number can not be smaller than 3 and it's maximum value is limited based on the total height of the rendering area.
 func (m model) getVisibleListHeight() int {
 	// Total available height minus borders, margin, header, search bar, and help line
 	h := m.height - 8
@@ -189,7 +194,7 @@ func (m model) View() string {
 		Height(availableHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1)
+		Padding(0, 1) // 0 padding for top and bottom, 1 for left and right
 
 	rightStyle := lipgloss.NewStyle().
 		Width(rightWidth).
@@ -212,9 +217,13 @@ func (m model) View() string {
 		Italic(true)
 
 	// Build Left Column Content
+
+	// Render the search prompt or the searched text based on current search mode.
 	searchPrompt := "Search: " + m.searchQuery
 	if m.searching {
-		searchPrompt += "█" // Fake cursor line
+		// When in search mode, show a fake cursor `█` to help guide the focus to this section.
+		// This will tell the user that pressing letters is now possible.
+		searchPrompt += searchPromptStyle.Foreground(lipgloss.Color("#00FF00")).Render("█")
 	} else if m.searchQuery == "" {
 		searchPrompt = "(Press '/' to search)"
 	}
@@ -233,15 +242,22 @@ func (m model) View() string {
 			endIdx = len(m.filtered)
 		}
 
+		// Render each filtered books.
+		// We skip some books (scrollOffset) if the number filtered books exceed how many book can fit in the left column.
+		// We then only render a subsection (a subwindow) of the filtered books.
 		for i := m.scrollOffset; i < endIdx; i++ {
 			book := m.filtered[i]
-			cursor := "  "
 			displayTitle := truncateText(book.Title, maxTitleLen)
 
+			// If this Books is the selected book...
+			cursor := "  "
 			if m.cursor == i {
+				// Draw the cursor, use a special style for this book's title
 				cursor = "> "
 				displayTitle = cursorStyle.Render(displayTitle)
 			}
+
+			// Render the Book
 			leftContent += fmt.Sprintf("%s%s\n", cursor, displayTitle)
 		}
 
@@ -273,7 +289,7 @@ func (m model) View() string {
 		rightStyle.Render(rightContent),
 	)
 
-	helpText := "\n ↑/↓: Navigate • Enter: Select • /: Search • Esc: Clear • q: Quit"
+	helpText := "\n ↑/↓: Navigate  |  Enter: Select  |  /: Search  |  Esc: Clear  |  q: Quit"
 	return columns + helpText + "\n"
 }
 
