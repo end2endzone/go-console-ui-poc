@@ -19,17 +19,39 @@ type Book struct {
 // Force model to always implements interface tea.Model
 var _ tea.Model = (*model)(nil)
 
+type Bounds struct {
+	top    int
+	right  int
+	bottom int
+	left   int
+}
+
 type model struct {
 	allBooks     []Book // These are the Books raw data. This slice is never rendered in the UI.
 	filtered     []Book // These are the Books that are rendered. Even when we do not filter, we copy allBooks to filtered. See `applyFilter()` for details.
 	cursor       int    // Selected Book index in `filtered` list.
-	scrollOffset int    // For list scrolling window
+	scrollOffset int    // For list scrolling subwindow within filtered when too many books can not be rendered into the ui.
 	searchQuery  string //
 	searching    bool   // Searching mode. When disabled, show "text to explain how to trigger the search mode". When enabled, show the actual text filter.
 	selectedBook *Book  // Selected Book when user presses ENTER
 	width        int
 	height       int
+	padding      Bounds
+	margin       Bounds
 }
+
+const (
+	topBorder            = 1 //
+	header               = 1 // "Books"
+	searchBar            = 1 //
+	topSpacer            = 1 //
+	booksCount           = 0 // Book titles
+	bottomSpacer         = 1 //
+	cursorIndexIndicator = 1 //
+	cursorWidth          = 2 // 2 characters "> "
+	bottomBorder         = 1 //
+	helpTextHeight       = 2 // help text is 1 line but ends with a \n
+)
 
 func initialModel() model {
 	books := []Book{
@@ -51,8 +73,12 @@ func initialModel() model {
 		allBooks: books,
 		width:    80,
 		height:   24,
+		padding:  Bounds{0, 1, 0, 1},
+		margin:   Bounds{0, 0, 0, 0},
 	}
+
 	m.applyFilter()
+
 	return m
 }
 
@@ -151,57 +177,58 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // This number can not be smaller than 3 and it's maximum value is limited based on the total height of the rendering area.
 func (m model) getVisibleListHeight() int {
 	// Total available height minus borders, margin, header, search bar, and help line
-	h := m.height - 8
-	if h < 3 {
-		return 3
+	h := m.height - topBorder - header - searchBar - topSpacer - bottomSpacer - cursorIndexIndicator - bottomBorder - m.padding.top - m.padding.bottom - helpTextHeight
+	if h < 1 {
+		return 1
 	}
 	return h
 }
 
-// Truncates text with trailing ellipsis to fit within column bounds
-func truncateText(text string, maxLen int) string {
-	if maxLen <= 3 {
-		return "..."
-	}
-	runes := []rune(text)
-	if len(runes) > maxLen {
-		return string(runes[:maxLen-3]) + "..."
-	}
-	return text
-}
-
 func (m model) View() string {
-	helpHeight := 2
-	availableHeight := m.height - helpHeight - 2
-	if availableHeight < 6 {
-		availableHeight = 6
+	panelsContentHeight := m.height - helpTextHeight - topBorder - bottomBorder
+
+	// Do not implement a minimum height
+	supportsMinimumHeight := true
+	if supportsMinimumHeight && panelsContentHeight < 6 {
+		// A minimum height of 6 lines is forced for the left panel
+		// which is the minimum information displayed:
+		// ```
+		// Books
+		// (Press '/' to search)
+		//
+		// > Title
+		//
+		// [5/12]
+		// ```
+		panelsContentHeight = 6
 	}
 
 	// Dynamic column calculation
-	leftWidth := int(float64(m.width) * 0.38)
-	rightWidth := m.width - leftWidth - 4
+	leftPanelContentWidth := int(float64(m.width) * 0.38)
+	leftPanelOutterWidth := leftPanelContentWidth + m.padding.left + m.padding.right
+	rightPanelContentWidth := m.width - leftPanelOutterWidth - m.padding.left - m.padding.right
 
-	if leftWidth < 22 {
-		leftWidth = 22
+	if leftPanelContentWidth < 22 {
+		leftPanelContentWidth = 22
 	}
-	if rightWidth < 25 {
-		rightWidth = 25
+	if rightPanelContentWidth < 25 {
+		rightPanelContentWidth = 25
 	}
 
 	// Styles
 	leftStyle := lipgloss.NewStyle().
-		Width(leftWidth).
-		Height(availableHeight).
+		Width(leftPanelContentWidth).
+		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1) // 0 padding for top and bottom, 1 for left and right
+		Padding(m.padding.top, m.padding.right, m.padding.bottom, m.padding.left)
 
 	rightStyle := lipgloss.NewStyle().
-		Width(rightWidth).
-		Height(availableHeight).
+		Width(rightPanelContentWidth).
+		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
-		Padding(0, 1)
+		Padding(m.padding.top, m.padding.right, m.padding.bottom, m.padding.left)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -216,7 +243,14 @@ func (m model) View() string {
 		Foreground(lipgloss.Color("214")).
 		Italic(true)
 
+	noResultFoundStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
 	// Build Left Column Content
+	var leftContent string
+
+	// Render left header
+	leftContent += lipgloss.NewStyle().Bold(true).Render("Books") + "\n"
 
 	// Render the search prompt or the searched text based on current search mode.
 	searchPrompt := "Search: " + m.searchQuery
@@ -227,15 +261,12 @@ func (m model) View() string {
 	} else if m.searchQuery == "" {
 		searchPrompt = "(Press '/' to search)"
 	}
-
-	leftContent := lipgloss.NewStyle().Bold(true).Render("Books") + "\n" +
-		searchPromptStyle.Render(searchPrompt) + "\n\n"
+	leftContent += searchPromptStyle.Render(searchPrompt) + "\n\n"
 
 	visibleCount := m.getVisibleListHeight()
-	maxTitleLen := leftWidth - 5 // Account for padding & indicator
 
 	if len(m.filtered) == 0 {
-		leftContent += lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" No results found")
+		leftContent += noResultFoundStyle.Render("No results found")
 	} else {
 		endIdx := m.scrollOffset + visibleCount
 		if endIdx > len(m.filtered) {
@@ -247,24 +278,28 @@ func (m model) View() string {
 		// We then only render a subsection (a subwindow) of the filtered books.
 		for i := m.scrollOffset; i < endIdx; i++ {
 			book := m.filtered[i]
-			displayTitle := truncateText(book.Title, maxTitleLen)
+
+			displayTitleMaxLen := leftPanelContentWidth - m.padding.left - m.padding.right - cursorWidth // Account for padding & indicator
+			displayTitle := truncateTextWidth(book.Title, displayTitleMaxLen)
 
 			// If this Books is the selected book...
 			cursor := "  "
 			if m.cursor == i {
-				// Draw the cursor, use a special style for this book's title
+				// Set the selected cursor & colorize with a style this book's title
 				cursor = "> "
 				displayTitle = cursorStyle.Render(displayTitle)
 			}
 
 			// Render the Book
-			leftContent += fmt.Sprintf("%s%s\n", cursor, displayTitle)
+			leftContent += cursor + displayTitle + "\n"
 		}
 
 		// Scroll indicator hint if more items exist
 		if len(m.filtered) > visibleCount {
-			leftContent += fmt.Sprintf("\n%s", lipgloss.NewStyle().Foreground(lipgloss.Color("241")).
-				Render(fmt.Sprintf(" [%d/%d]", m.cursor+1, len(m.filtered))))
+			scrollIndicatorStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("241"))
+			text := fmt.Sprintf(" [%d/%d]", m.cursor+1, len(m.filtered))
+			leftContent += "\n" + scrollIndicatorStyle.Render(text)
 		}
 	}
 
@@ -272,7 +307,7 @@ func (m model) View() string {
 	var rightContent string
 	if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 		selected := m.filtered[m.cursor]
-		descStyle := lipgloss.NewStyle().Width(rightWidth - 4)
+		descStyle := lipgloss.NewStyle().Width(rightPanelContentWidth - 4)
 
 		rightContent = titleStyle.Render(selected.Title) + "\n" +
 			fmt.Sprintf("Author: %s\n", selected.Author) +
@@ -281,6 +316,10 @@ func (m model) View() string {
 	} else {
 		rightContent = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("No book selected.")
 	}
+
+	// Truncate content if required
+	leftContent = truncateTextHeight(leftContent, panelsContentHeight)
+	rightContent = truncateTextHeight(rightContent, panelsContentHeight)
 
 	// Join both columns
 	columns := lipgloss.JoinHorizontal(
