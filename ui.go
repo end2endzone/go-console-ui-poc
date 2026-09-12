@@ -49,12 +49,15 @@ func (v *View) SplitPanelsVerticalyByRatio(ratios []float32) {
 
 		var newSize Size
 
+		// width
 		if !isLast {
 			newSize.Width = int(ratios[i] * float32(v.Size.Width))
 		} else {
 			newSize.Width = remainingWidth
 		}
 		remainingWidth -= newSize.Width
+
+		// height
 		newSize.Height = v.Size.Height
 
 		panel.SetSize(newSize)
@@ -62,9 +65,11 @@ func (v *View) SplitPanelsVerticalyByRatio(ratios []float32) {
 }
 
 func (p *Panel) Style() lipgloss.Style {
+	size := p.GetStyleSize()
+
 	style := lipgloss.NewStyle().
-		Width(p.BorderSize.Width).
-		Height(p.BorderSize.Height).
+		Width(size.Width).
+		Height(size.Height).
 		Border(lipgloss.RoundedBorder()).
 		Padding(p.Padding.Top, p.Padding.Right, p.Padding.Bottom, p.Padding.Left)
 
@@ -72,8 +77,22 @@ func (p *Panel) Style() lipgloss.Style {
 }
 
 func (p *Panel) SetSize(size Size) {
-	size.Width -= (p.Margin.Left + p.Margin.Right)
-	size.Height -= (p.Margin.Top + p.Margin.Bottom)
+	// Do not allow size < 0
+	if size.Width < 0 {
+		size.Width = 0
+	}
+	if size.Height < 0 {
+		size.Height = 0
+	}
+
+	// Checks minimums
+	if size.Width < p.MinimumWidth {
+		size.Width = p.MinimumWidth
+	}
+	if size.Height < p.MinimumHeight {
+		size.Height = p.MinimumHeight
+	}
+
 	p.BorderSize = size
 }
 
@@ -81,16 +100,57 @@ func (p *Panel) GetBorderSize() Size {
 	return p.BorderSize
 }
 
-func (p *Panel) GetInnerSize() Size {
+// GetStyleSize returns the dimension of the box style inside the panel.
+// This size is defined by the border size minus the width and height of the borders.
+func (p *Panel) GetStyleSize() Size {
 	size := p.BorderSize
-	size.Width -= (p.Padding.Left + p.Padding.Right)
-	size.Height -= (p.Padding.Top + p.Padding.Bottom)
+
+	// Remove the width and height of the borders
+	size.Width -= 2
+	size.Height -= 2
+
+	// Do not allow size < 0
+	if size.Width < 0 {
+		size.Width = 0
+	}
+	if size.Height < 0 {
+		size.Height = 0
+	}
+
 	return size
 }
 
+// GetRenderSize returns the maximum dimension of the renderable area inside the panel.
+// This size is defined by the border size minus the borders width/height and the inner padding.
+func (p *Panel) GetRenderSize() Size {
+	size := p.BorderSize
+
+	// Remove the width and height of the borders
+	size.Width -= 2
+	size.Height -= 2
+
+	// Remove padding
+	size.Width -= (p.Padding.Left + p.Padding.Right)
+	size.Height -= (p.Padding.Top + p.Padding.Bottom)
+
+	// Do not allow size < 0
+	if size.Width < 0 {
+		size.Width = 0
+	}
+	if size.Height < 0 {
+		size.Height = 0
+	}
+
+	return size
+}
+
+// GetOutterSize returns the total dimension of the panel.
+// This dimensions is defined by the border size plus the outter margins.
 func (p *Panel) GetOutterSize() Size {
 	size := p.BorderSize
-	size.Width -= (p.Margin.Left + p.Margin.Right)
-	size.Height -= (p.Margin.Top + p.Margin.Bottom)
+
+	size.Width += (p.Margin.Left + p.Margin.Right)
+	size.Height += (p.Margin.Top + p.Margin.Bottom)
+
 	return size
 }

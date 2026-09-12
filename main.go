@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -42,7 +40,7 @@ const (
 	cursorIndexIndicator = 1 //
 	cursorWidth          = 2 // 2 characters "> "
 	bottomBorder         = 1 //
-	helpTextHeight       = 2 // help text is 1 line but ends with a \n
+	helpTextHeight       = 1 // help text is 1 line. It must not ends with a \n
 )
 
 func initialModel() model {
@@ -64,10 +62,6 @@ func initialModel() model {
 	m := model{
 		allBooks: books,
 		view: View{
-			Size: Size{
-				Width:  80,
-				Height: 24,
-			},
 			Panels: []*Panel{
 				&Panel{},
 				&Panel{},
@@ -75,10 +69,23 @@ func initialModel() model {
 		},
 	}
 
-	// Set padding for all panels
+	// Set initial view size
+	m.view.Size = Size{
+		Width:  80,
+		Height: 24,
+	}
+
+	// Since the view size has changed, recompute panels dimensions
+	m.view.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
+
+	// Set constant settings for all panels
 	for _, panel := range m.view.Panels {
 		panel.Padding = Bounds{0, 1, 0, 1}
+		panel.MinimumHeight = 6
 	}
+
+	m.view.Panels[0].MinimumWidth = 22
+	m.view.Panels[1].MinimumWidth = 25
 
 	m.applyFilter()
 
@@ -119,6 +126,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.view.Size.Width = msg.Width
 		m.view.Size.Height = msg.Height
+
+		// Remove 1 line to render helpText below the panels
+		m.view.Size.Height -= 1
+		if m.view.Size.Height < 0 {
+			m.view.Size.Height = 0
+		}
+
+		// Since the view size has changed, recompute panels dimensions
+		m.view.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -179,8 +195,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // getVisibleListHeight returns the number of books that must be displayed in the left panel.
 // This number can not be smaller than 3 and it's maximum value is limited based on the total height of the rendering area.
 func (m model) getVisibleListHeight() int {
-	// Total available height minus borders, margin, header, search bar, and help line
-	h := m.view.Size.Height - topBorder - header - searchBar - topSpacer - bottomSpacer - cursorIndexIndicator - bottomBorder - m.view.Panels[0].Padding.Top - m.view.Panels[0].Padding.Bottom - helpTextHeight
+
+	// Content of left panel:
+	// ```
+	// Header
+	// Search Bar
+	//
+	// List Content
+	//
+	// Cursor indicator [5/12]
+	// ```
+	//
+	// Which is 5 constant lines + how many lines of the list we want to show
+
+	contentSize := m.view.Panels[0].GetRenderSize()
+	h := contentSize.Height - 5
 	if h < 1 {
 		return 1
 	}
@@ -188,50 +217,166 @@ func (m model) getVisibleListHeight() int {
 }
 
 func (m model) View() string {
-	panelsContentHeight := m.view.Size.Height - helpTextHeight - topBorder - bottomBorder
+	return m.ViewOfficial()
+}
 
-	// Do not implement a minimum height
-	supportsMinimumHeight := true
-	if supportsMinimumHeight && panelsContentHeight < 6 {
-		// A minimum height of 6 lines is forced for the left panel
-		// which is the minimum information displayed:
-		// ```
-		// Books
-		// (Press '/' to search)
-		//
-		// > Title
-		//
-		// [5/12]
-		// ```
-		panelsContentHeight = 6
+// ViewDebug is a debugging view.
+// The following code and styles shows lipgloss packages behavior.
+// It renders the following text:
+//
+// ╭──────────╮╭──────────╮╭──────────╮╭──────────╮
+// │1234567890││          ││    12345 ││If we     │
+// │2         ││  text    ││    2aaaa ││render too│
+// │3         ││  auto    ││    3bbbb ││much text │
+// │4   10x8  ││  wrappe  ││    4cccc ││in the    │
+// │5         ││  d in    ││    5dddd ││box, the  │
+// │6         ││  paddin  ││    6eeee ││height of │
+// │7         ││  g       ││          ││the box   │
+// │8         ││          ││          ││will      │
+// ╰──────────╯╰──────────╯╰──────────╯│expand to │
+// .                                   │fit the   │
+// .                                   │content.  │
+// .                                   │Text must │
+// .                                   │be        │
+// .                                   │truncated │
+// .                                   │manually. │
+// .                                   ╰──────────╯
+// ↑/↓: Navigate  |  Enter: Select  |  /: Search  |  Esc: Clear  |  q: Quit
+// p3.borders(10,8), p3.inner(5,6)
+// [EMPTY LINE]
+func (m model) ViewDebug() string {
+	/*
+		panel1 := lipgloss.NewStyle().
+			Padding(0, 0, 0, 0).
+			Width(10).
+			Height(8).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FF0000"))
+
+		panel2 := lipgloss.NewStyle().
+			Padding(1, 2).
+			Width(10).
+			Height(8).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#00FF00"))
+
+		panel3 := lipgloss.NewStyle().
+			Padding(1).
+			Width(10).
+			Height(8).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#0000FF"))
+
+		panel4 := lipgloss.NewStyle().
+			Padding(0, 0, 0, 0).
+			Width(10).
+			Height(8).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("204"))
+	*/
+
+	panel1 := Panel{
+		BorderSize: Size{10, 8},
 	}
 
-	// Dynamic column calculation
-	leftPanelContentWidth := int(float64(m.view.Size.Width) * 0.38)
-	leftPanelOutterWidth := leftPanelContentWidth + m.view.Panels[0].Padding.Left + m.view.Panels[0].Padding.Right
-	rightPanelContentWidth := m.view.Size.Width - leftPanelOutterWidth - m.view.Panels[0].Padding.Left - m.view.Panels[0].Padding.Right
+	panel2 := Panel{
+		BorderSize: Size{10, 8},
+		Padding:    Bounds{1, 2, 1, 2},
+	}
 
-	if leftPanelContentWidth < 22 {
-		leftPanelContentWidth = 22
+	panel3 := Panel{
+		BorderSize: Size{10, 8},
+		Padding:    Bounds{0, 1, 2, 4},
 	}
-	if rightPanelContentWidth < 25 {
-		rightPanelContentWidth = 25
+
+	panel4 := Panel{
+		BorderSize: Size{10, 8},
 	}
+
+	s1 := panel1.Style().
+		BorderForeground(lipgloss.Color("#FF0000"))
+	s2 := panel2.Style().
+		BorderForeground(lipgloss.Color("#00FF00"))
+	s3 := panel3.Style().
+		BorderForeground(lipgloss.Color("#0000FF"))
+	s4 := panel4.Style().
+		BorderForeground(lipgloss.Color("204"))
+
+	// Join all columns
+	columns := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		s1.Render("1234567890\n2\n3\n4   10x8\n5\n6\n7\n8"),
+		s2.Render("text auto wrapped in padding"),
+		s3.Render("123452aaaa3bbbb4cccc5dddd6eeee"),
+		s4.Render("If we render too much text in the box, the height of the box will expand to fit the content. Text must be truncated manually."),
+	)
+
+	helpText := "↑/↓: Navigate  |  Enter: Select  |  /: Search  |  Esc: Clear  |  q: Quit"
+
+	sizes := fmt.Sprintf("p3.borders(%d,%d), p3.inner(%d,%d)\n",
+		panel3.GetBorderSize().Width,
+		panel3.GetBorderSize().Height,
+		panel3.GetRenderSize().Width,
+		panel3.GetRenderSize().Height,
+	)
+	return columns + "\n" + helpText + "\n" + sizes + "\n"
+}
+
+func (m model) ViewOfficial() string {
+	leftPanel := m.view.Panels[0]
+	rightPanel := m.view.Panels[1]
+
+	panelsContentHeight := leftPanel.GetRenderSize().Height // m.view.Size.Height - helpTextHeight - topBorder - bottomBorder
+
+	/*
+		// Do not implement a minimum height
+		supportsMinimumHeight := true
+		if supportsMinimumHeight && panelsContentHeight < 6 {
+			// A minimum height of 6 lines is forced for the left panel
+			// which is the minimum information displayed:
+			// ```
+			// Books
+			// (Press '/' to search)
+			//
+			// > Title
+			//
+			// [5/12]
+			// ```
+			panelsContentHeight = 6
+		}
+	*/
+
+	/*
+		// Dynamic column calculation
+		leftPanelContentWidth := int(float64(m.view.Size.Width) * 0.38)
+		leftPanelOutterWidth := leftPanelContentWidth + m.view.Panels[0].Padding.Left + m.view.Panels[0].Padding.Right
+		rightPanelContentWidth := m.view.Size.Width - leftPanelOutterWidth - m.view.Panels[0].Padding.Left - m.view.Panels[0].Padding.Right
+
+		if leftPanelContentWidth < 22 {
+			leftPanelContentWidth = 22
+		}
+		if rightPanelContentWidth < 25 {
+			rightPanelContentWidth = 25
+		}
+	*/
 
 	// Styles
-	leftStyle := lipgloss.NewStyle().
+	leftStyle := leftPanel.Style().
+		BorderForeground(lipgloss.Color("63"))
+		/*lipgloss.NewStyle().
 		Width(leftPanelContentWidth).
 		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)
+		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)*/
 
-	rightStyle := lipgloss.NewStyle().
+	rightStyle := rightPanel.Style().
+		BorderForeground(lipgloss.Color("205"))
+		/*lipgloss.NewStyle().
 		Width(rightPanelContentWidth).
 		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
-		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)
+		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)*/
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -282,7 +427,8 @@ func (m model) View() string {
 		for i := m.scrollOffset; i < endIdx; i++ {
 			book := m.filtered[i]
 
-			displayTitleMaxLen := leftPanelContentWidth - m.view.Panels[0].Padding.Left - m.view.Panels[0].Padding.Right - cursorWidth // Account for padding & indicator
+			contentSize := leftPanel.GetRenderSize()
+			displayTitleMaxLen := contentSize.Width - cursorWidth // Account for indicator
 			displayTitle := truncateTextWidth(book.Title, displayTitleMaxLen)
 
 			// If this Books is the selected book...
@@ -310,7 +456,7 @@ func (m model) View() string {
 	var rightContent string
 	if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 		selected := m.filtered[m.cursor]
-		descStyle := lipgloss.NewStyle().Width(rightPanelContentWidth - 4)
+		descStyle := lipgloss.NewStyle().Width(rightPanel.GetRenderSize().Width)
 
 		rightContent = titleStyle.Render(selected.Title) + "\n" +
 			fmt.Sprintf("Author: %s\n", selected.Author) +
@@ -332,7 +478,7 @@ func (m model) View() string {
 	)
 
 	helpText := "\n ↑/↓: Navigate  |  Enter: Select  |  /: Search  |  Esc: Clear  |  q: Quit"
-	return columns + helpText + "\n"
+	return columns + helpText
 }
 
 func main() {
@@ -354,28 +500,4 @@ func main() {
 	} else {
 		fmt.Println("\nNo book was selected.")
 	}
-}
-
-func main2() {
-	view := View{
-		Panels: []*Panel{
-			&Panel{},
-			&Panel{},
-		},
-	}
-
-	view.Size = Size{
-		Width:  200,
-		Height: 34,
-	}
-
-	view.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
-
-	jsonBytes, err := json.MarshalIndent(view, "", "  ")
-	if err != nil {
-		log.Fatalf("Failed to serialize view to JSON: %v", err)
-	}
-
-	fmt.Println("--- Serialized JSON String ---")
-	fmt.Println(string(jsonBytes))
 }
