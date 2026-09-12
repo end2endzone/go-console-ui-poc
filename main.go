@@ -217,64 +217,21 @@ func (m model) getVisibleListHeight() int {
 }
 
 func (m model) View() string {
-	return ViewDebug()
+	return m.ViewOfficial()
 }
 
 func (m model) ViewOfficial() string {
 	leftPanel := m.view.Panels[0]
 	rightPanel := m.view.Panels[1]
 
-	panelsContentHeight := leftPanel.GetRenderSize().Height // m.view.Size.Height - helpTextHeight - topBorder - bottomBorder
-
-	/*
-		// Do not implement a minimum height
-		supportsMinimumHeight := true
-		if supportsMinimumHeight && panelsContentHeight < 6 {
-			// A minimum height of 6 lines is forced for the left panel
-			// which is the minimum information displayed:
-			// ```
-			// Books
-			// (Press '/' to search)
-			//
-			// > Title
-			//
-			// [5/12]
-			// ```
-			panelsContentHeight = 6
-		}
-	*/
-
-	/*
-		// Dynamic column calculation
-		leftPanelContentWidth := int(float64(m.view.Size.Width) * 0.38)
-		leftPanelOutterWidth := leftPanelContentWidth + m.view.Panels[0].Padding.Left + m.view.Panels[0].Padding.Right
-		rightPanelContentWidth := m.view.Size.Width - leftPanelOutterWidth - m.view.Panels[0].Padding.Left - m.view.Panels[0].Padding.Right
-
-		if leftPanelContentWidth < 22 {
-			leftPanelContentWidth = 22
-		}
-		if rightPanelContentWidth < 25 {
-			rightPanelContentWidth = 25
-		}
-	*/
+	panelsContentHeight := leftPanel.GetRenderSize().Height
 
 	// Styles
 	leftStyle := leftPanel.Style().
 		BorderForeground(lipgloss.Color("63"))
-		/*lipgloss.NewStyle().
-		Width(leftPanelContentWidth).
-		Height(panelsContentHeight).
-		Border(lipgloss.RoundedBorder()).
-		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)*/
 
 	rightStyle := rightPanel.Style().
 		BorderForeground(lipgloss.Color("205"))
-		/*lipgloss.NewStyle().
-		Width(rightPanelContentWidth).
-		Height(panelsContentHeight).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
-		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)*/
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -293,10 +250,10 @@ func (m model) ViewOfficial() string {
 		Foreground(lipgloss.Color("240"))
 
 	// Build Left Column Content
-	var leftContent string
+	leftPanel.Content = ""
 
 	// Render left header
-	leftContent += lipgloss.NewStyle().Bold(true).Render("Books") + "\n"
+	leftPanel.Content += lipgloss.NewStyle().Bold(true).Render("Books") + "\n"
 
 	// Render the search prompt or the searched text based on current search mode.
 	searchPrompt := "Search: " + m.searchQuery
@@ -307,12 +264,12 @@ func (m model) ViewOfficial() string {
 	} else if m.searchQuery == "" {
 		searchPrompt = "(Press '/' to search)"
 	}
-	leftContent += searchPromptStyle.Render(searchPrompt) + "\n\n"
+	leftPanel.Content += searchPromptStyle.Render(searchPrompt) + "\n\n"
 
 	visibleCount := m.getVisibleListHeight()
 
 	if len(m.filtered) == 0 {
-		leftContent += noResultFoundStyle.Render("No results found")
+		leftPanel.Content += noResultFoundStyle.Render("No results found")
 	} else {
 		endIdx := m.scrollOffset + visibleCount
 		if endIdx > len(m.filtered) {
@@ -338,7 +295,7 @@ func (m model) ViewOfficial() string {
 			}
 
 			// Render the Book
-			leftContent += cursor + displayTitle + "\n"
+			leftPanel.Content += cursor + displayTitle + "\n"
 		}
 
 		// Scroll indicator hint if more items exist
@@ -346,33 +303,33 @@ func (m model) ViewOfficial() string {
 			scrollIndicatorStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("241"))
 			text := fmt.Sprintf(" [%d/%d]", m.cursor+1, len(m.filtered))
-			leftContent += "\n" + scrollIndicatorStyle.Render(text)
+			leftPanel.Content += "\n" + scrollIndicatorStyle.Render(text)
 		}
 	}
 
 	// Build Right Column Content
-	var rightContent string
+	rightPanel.Content = ""
 	if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 		selected := m.filtered[m.cursor]
 		descStyle := lipgloss.NewStyle().Width(rightPanel.GetRenderSize().Width)
 
-		rightContent = titleStyle.Render(selected.Title) + "\n" +
+		rightPanel.Content = titleStyle.Render(selected.Title) + "\n" +
 			fmt.Sprintf("Author: %s\n", selected.Author) +
 			fmt.Sprintf("Year:   %d\n\n", selected.Year) +
 			descStyle.Render(fmt.Sprintf("Details:\n%s", selected.Description))
 	} else {
-		rightContent = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("No book selected.")
+		rightPanel.Content = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("No book selected.")
 	}
 
 	// Truncate content if required
-	leftContent = truncateTextHeight(leftContent, panelsContentHeight)
-	rightContent = truncateTextHeight(rightContent, panelsContentHeight)
+	leftPanel.Content = truncateTextHeight(leftPanel.Content, panelsContentHeight)
+	rightPanel.Content = truncateTextHeight(rightPanel.Content, panelsContentHeight)
 
 	// Join both columns
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		leftStyle.Render(leftContent),
-		rightStyle.Render(rightContent),
+		leftStyle.Render(leftPanel.Content),
+		rightStyle.Render(rightPanel.Content),
 	)
 
 	helpText := "\n ↑/↓: Navigate  |  Enter: Select  |  /: Search  |  Esc: Clear  |  q: Quit"
