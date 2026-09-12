@@ -19,13 +19,6 @@ type Book struct {
 // Force model to always implements interface tea.Model
 var _ tea.Model = (*model)(nil)
 
-type Bounds struct {
-	top    int
-	right  int
-	bottom int
-	left   int
-}
-
 type model struct {
 	allBooks     []Book // These are the Books raw data. This slice is never rendered in the UI.
 	filtered     []Book // These are the Books that are rendered. Even when we do not filter, we copy allBooks to filtered. See `applyFilter()` for details.
@@ -177,7 +170,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // This number can not be smaller than 3 and it's maximum value is limited based on the total height of the rendering area.
 func (m model) getVisibleListHeight() int {
 	// Total available height minus borders, margin, header, search bar, and help line
-	h := m.height - topBorder - header - searchBar - topSpacer - bottomSpacer - cursorIndexIndicator - bottomBorder - m.padding.top - m.padding.bottom - helpTextHeight
+	h := m.height - topBorder - header - searchBar - topSpacer - bottomSpacer - cursorIndexIndicator - bottomBorder - m.padding.Top - m.padding.Bottom - helpTextHeight
 	if h < 1 {
 		return 1
 	}
@@ -205,8 +198,8 @@ func (m model) View() string {
 
 	// Dynamic column calculation
 	leftPanelContentWidth := int(float64(m.width) * 0.38)
-	leftPanelOutterWidth := leftPanelContentWidth + m.padding.left + m.padding.right
-	rightPanelContentWidth := m.width - leftPanelOutterWidth - m.padding.left - m.padding.right
+	leftPanelOutterWidth := leftPanelContentWidth + m.padding.Left + m.padding.Right
+	rightPanelContentWidth := m.width - leftPanelOutterWidth - m.padding.Left - m.padding.Right
 
 	if leftPanelContentWidth < 22 {
 		leftPanelContentWidth = 22
@@ -221,14 +214,14 @@ func (m model) View() string {
 		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Padding(m.padding.top, m.padding.right, m.padding.bottom, m.padding.left)
+		Padding(m.padding.Top, m.padding.Right, m.padding.Bottom, m.padding.Left)
 
 	rightStyle := lipgloss.NewStyle().
 		Width(rightPanelContentWidth).
 		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
-		Padding(m.padding.top, m.padding.right, m.padding.bottom, m.padding.left)
+		Padding(m.padding.Top, m.padding.Right, m.padding.Bottom, m.padding.Left)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -279,7 +272,7 @@ func (m model) View() string {
 		for i := m.scrollOffset; i < endIdx; i++ {
 			book := m.filtered[i]
 
-			displayTitleMaxLen := leftPanelContentWidth - m.padding.left - m.padding.right - cursorWidth // Account for padding & indicator
+			displayTitleMaxLen := leftPanelContentWidth - m.padding.Left - m.padding.Right - cursorWidth // Account for padding & indicator
 			displayTitle := truncateTextWidth(book.Title, displayTitleMaxLen)
 
 			// If this Books is the selected book...
