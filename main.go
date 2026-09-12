@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -27,10 +29,7 @@ type model struct {
 	searchQuery  string //
 	searching    bool   // Searching mode. When disabled, show "text to explain how to trigger the search mode". When enabled, show the actual text filter.
 	selectedBook *Book  // Selected Book when user presses ENTER
-	width        int
-	height       int
-	padding      Bounds
-	margin       Bounds
+	view         View
 }
 
 const (
@@ -64,10 +63,19 @@ func initialModel() model {
 
 	m := model{
 		allBooks: books,
-		width:    80,
-		height:   24,
-		padding:  Bounds{0, 1, 0, 1},
-		margin:   Bounds{0, 0, 0, 0},
+		view: View{
+			Size: Size{
+				Width:  80,
+				Height: 24,
+			},
+			Panels: make([]Panel, 2),
+		},
+	}
+
+	// Set padding for all panels
+	for i := range m.view.Panels {
+		panel := &m.view.Panels[i]
+		panel.Padding = Bounds{0, 1, 0, 1}
 	}
 
 	m.applyFilter()
@@ -107,8 +115,8 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.view.Size.Width = msg.Width
+		m.view.Size.Height = msg.Height
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -170,7 +178,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // This number can not be smaller than 3 and it's maximum value is limited based on the total height of the rendering area.
 func (m model) getVisibleListHeight() int {
 	// Total available height minus borders, margin, header, search bar, and help line
-	h := m.height - topBorder - header - searchBar - topSpacer - bottomSpacer - cursorIndexIndicator - bottomBorder - m.padding.Top - m.padding.Bottom - helpTextHeight
+	h := m.view.Size.Height - topBorder - header - searchBar - topSpacer - bottomSpacer - cursorIndexIndicator - bottomBorder - m.view.Panels[0].Padding.Top - m.view.Panels[0].Padding.Bottom - helpTextHeight
 	if h < 1 {
 		return 1
 	}
@@ -178,7 +186,7 @@ func (m model) getVisibleListHeight() int {
 }
 
 func (m model) View() string {
-	panelsContentHeight := m.height - helpTextHeight - topBorder - bottomBorder
+	panelsContentHeight := m.view.Size.Height - helpTextHeight - topBorder - bottomBorder
 
 	// Do not implement a minimum height
 	supportsMinimumHeight := true
@@ -197,9 +205,9 @@ func (m model) View() string {
 	}
 
 	// Dynamic column calculation
-	leftPanelContentWidth := int(float64(m.width) * 0.38)
-	leftPanelOutterWidth := leftPanelContentWidth + m.padding.Left + m.padding.Right
-	rightPanelContentWidth := m.width - leftPanelOutterWidth - m.padding.Left - m.padding.Right
+	leftPanelContentWidth := int(float64(m.view.Size.Width) * 0.38)
+	leftPanelOutterWidth := leftPanelContentWidth + m.view.Panels[0].Padding.Left + m.view.Panels[0].Padding.Right
+	rightPanelContentWidth := m.view.Size.Width - leftPanelOutterWidth - m.view.Panels[0].Padding.Left - m.view.Panels[0].Padding.Right
 
 	if leftPanelContentWidth < 22 {
 		leftPanelContentWidth = 22
@@ -214,14 +222,14 @@ func (m model) View() string {
 		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Padding(m.padding.Top, m.padding.Right, m.padding.Bottom, m.padding.Left)
+		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)
 
 	rightStyle := lipgloss.NewStyle().
 		Width(rightPanelContentWidth).
 		Height(panelsContentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
-		Padding(m.padding.Top, m.padding.Right, m.padding.Bottom, m.padding.Left)
+		Padding(m.view.Panels[0].Padding.Top, m.view.Panels[0].Padding.Right, m.view.Panels[0].Padding.Bottom, m.view.Panels[0].Padding.Left)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -272,7 +280,7 @@ func (m model) View() string {
 		for i := m.scrollOffset; i < endIdx; i++ {
 			book := m.filtered[i]
 
-			displayTitleMaxLen := leftPanelContentWidth - m.padding.Left - m.padding.Right - cursorWidth // Account for padding & indicator
+			displayTitleMaxLen := leftPanelContentWidth - m.view.Panels[0].Padding.Left - m.view.Panels[0].Padding.Right - cursorWidth // Account for padding & indicator
 			displayTitle := truncateTextWidth(book.Title, displayTitleMaxLen)
 
 			// If this Books is the selected book...
@@ -344,4 +352,25 @@ func main() {
 	} else {
 		fmt.Println("\nNo book was selected.")
 	}
+}
+
+func main2() {
+	view := View{
+		Panels: make([]Panel, 2),
+	}
+
+	view.Size = Size{
+		Width:  200,
+		Height: 34,
+	}
+
+	view.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
+
+	jsonBytes, err := json.MarshalIndent(view, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to serialize view to JSON: %v", err)
+	}
+
+	fmt.Println("--- Serialized JSON String ---")
+	fmt.Println(string(jsonBytes))
 }
