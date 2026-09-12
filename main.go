@@ -68,13 +68,15 @@ func initialModel() model {
 				Width:  80,
 				Height: 24,
 			},
-			Panels: make([]Panel, 2),
+			Panels: []*Panel{
+				&Panel{},
+				&Panel{},
+			},
 		},
 	}
 
 	// Set padding for all panels
-	for i := range m.view.Panels {
-		panel := &m.view.Panels[i]
+	for _, panel := range m.view.Panels {
 		panel.Padding = Bounds{0, 1, 0, 1}
 	}
 
@@ -356,7 +358,10 @@ func main() {
 
 func main2() {
 	view := View{
-		Panels: make([]Panel, 2),
+		Panels: []*Panel{
+			&Panel{},
+			&Panel{},
+		},
 	}
 
 	view.Size = Size{

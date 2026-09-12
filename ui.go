@@ -32,8 +32,8 @@ type Panel struct {
 
 // View holds a collection of panels and its own dimensions.
 type View struct {
-	Panels []Panel `json:"panels"`
-	Size   Size    `json:"size,omitempty"`
+	Panels []*Panel `json:"panels"`
+	Size   Size     `json:"size,omitempty"`
 }
 
 func (v *View) SplitPanelsVerticalyByRatio(ratios []float32) {
@@ -44,9 +44,8 @@ func (v *View) SplitPanelsVerticalyByRatio(ratios []float32) {
 
 	// Split the view size into the given panels
 	remainingWidth := v.Size.Width
-	for i := range v.Panels {
+	for i, panel := range v.Panels {
 		isLast := (i + 1) == len(v.Panels)
-		panel := &v.Panels[i]
 
 		var newSize Size
 
