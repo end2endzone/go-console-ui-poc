@@ -4,12 +4,12 @@ import "github.com/charmbracelet/lipgloss"
 
 // View holds a collection of panels and its own dimensions.
 type OptionSelector struct {
-	Options         []any `json:"values"`
-	OptionsRenderer func(any) string
-	Size            Size `json:"size,omitempty"`       // Size of the rendered area
-	CursorIcon      rune `json:"cursorIcon,omitempty"` // Cursor icon highlighting selected option
-	CursorIndex     int  `json:"cursor,omitempty"`     // Index of selected option in Values
-	scrollOffset    int  //`json:"scrollOffset,omitempty"` // For list scrolling subwindow. When all values can not be rendered into the Size area.
+	Options         []any            `json:"values"`               // The list of option values to select from.
+	OptionsRenderer func(any) string ``                            // An external function to convert an Option to a display string.
+	Size            Size             `json:"size,omitempty"`       // Size of the rendered area
+	CursorIcon      rune             `json:"cursorIcon,omitempty"` // Cursor icon highlighting selected option
+	CursorIndex     int              `json:"cursor,omitempty"`     // Index of selected option in Values
+	scrollOffset    int              //`json:"scrollOffset,omitempty"` // For list scrolling subwindow. When all values can not be rendered into the Size area.
 }
 
 func NewOptionSelector() OptionSelector {
