@@ -51,13 +51,29 @@ func ReadBooksFromFile(filePath string) ([]Book, error) {
 	return books, nil
 }
 
-func getTableColumnsWidth(t table.Model) int {
+func getTableColumnsWidth(t *table.Model) int {
 	width := 0
 	columns := t.Columns()
 	for _, c := range columns {
 		width += 1 + c.Width + 1 // each column is padded with 1 space. In other words, a 25 characters wide columns is 27 characters long.
 	}
 	return width
+}
+
+func ShrinkTableLastColumn(t *table.Model) {
+	// First remove the last column in rows.
+	// Without this, there is an index out of range runtime error.
+	rows := t.Rows()
+	for i := range rows {
+		// remove 1 column in the row
+		rows[i] = rows[i][:len(rows[i])-1]
+	}
+	t.SetRows(rows)
+
+	// Then remove the actual last column
+	columns := t.Columns()
+	columns = columns[:len(columns)-1]
+	t.SetColumns(columns)
 }
 
 func initialModel() model {
@@ -137,7 +153,7 @@ func (m model) renderViewportWithScrollbar() string {
 		thumbPos = 0
 	}
 
-	// Attach scrollbar character at the end of each displayed line
+	// Append scrollbar character at the end of each displayed line
 	var output strings.Builder
 	for i, line := range lines {
 		var scrollChar string
@@ -185,8 +201,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var contentHeight int
 		{
 			// Width computation of both panels
+			var tableWidth int
 			{
-				tableWidth := getTableColumnsWidth(m.table)
+				tableWidth = getTableColumnsWidth(&m.table)
 				leftWidth = tableWidth + 4           // +2 for padding (1 on each side), +2 borders
 				rightWidth = m.width - leftWidth - 4 // don't really know why I need to remove these 4 mandatory spaces but if I don't each line are clipped.
 
@@ -210,6 +227,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					tableHeight = minTableHeight
 				}
 
+				//// Debuging code to auto-shrink the table to match a target leftWidth value ?
+				//if len(m.table.Columns()) == 3 {
+				//	ShrinkTableLastColumn(&m.table)
+				//	ShrinkTableLastColumn(&m.table)
+				//}
+
+				// Leave table's width to default value 0 so that is uses the minimum required width
 				m.table.SetHeight(tableHeight)
 			}
 		}
@@ -315,7 +339,8 @@ func (m model) View() string {
 
 func main() {
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	_, err := p.Run()
+	if err != nil {
 		fmt.Printf("Error running program: %v\n", err)
 		os.Exit(1)
 	}
