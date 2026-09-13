@@ -2,13 +2,13 @@ package main
 
 import "fmt"
 
-// View holds a collection of panels and its own dimensions.
-type View struct {
+// Frame holds a collection of panels and its own dimensions.
+type Frame struct {
 	Panels []*Panel `json:"panels"`
 	Size   Size     `json:"size,omitempty"`
 }
 
-func (v *View) SplitPanelsVerticalyByRatio(ratios []float32) {
+func (v *Frame) SplitPanelsVerticalyByRatio(ratios []float32) {
 	if len(ratios) != len(v.Panels) {
 		err := fmt.Errorf("Number of panels and split ratios do not match!")
 		panic(err)

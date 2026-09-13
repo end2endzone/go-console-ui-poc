@@ -27,7 +27,7 @@ type model struct {
 	searchQuery  string //
 	searching    bool   // Searching mode. When disabled, show "text to explain how to trigger the search mode". When enabled, show the actual text filter.
 	selectedBook *Book  // Selected Book when user presses ENTER
-	view         View
+	frame        Frame
 	selector     OptionSelector
 }
 
@@ -49,7 +49,7 @@ func initialModel() model {
 
 	m := model{
 		allBooks: books,
-		view: View{
+		frame: Frame{
 			Panels: []*Panel{
 				&Panel{},
 				&Panel{},
@@ -58,22 +58,22 @@ func initialModel() model {
 	}
 
 	// Set initial view size
-	m.view.Size = Size{
+	m.frame.Size = Size{
 		Width:  80,
 		Height: 24,
 	}
 
 	// Since the view size has changed, recompute panels dimensions
-	m.view.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
+	m.frame.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
 
 	// Set constant settings for all panels
-	for _, panel := range m.view.Panels {
+	for _, panel := range m.frame.Panels {
 		panel.Padding = Bounds{0, 1, 0, 1}
 		panel.MinimumHeight = 6
 	}
 
-	m.view.Panels[0].MinimumWidth = 22
-	m.view.Panels[1].MinimumWidth = 25
+	m.frame.Panels[0].MinimumWidth = 22
+	m.frame.Panels[1].MinimumWidth = 25
 
 	m.applyFilter()
 
@@ -114,20 +114,20 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.view.Size.Width = msg.Width
-		m.view.Size.Height = msg.Height
+		m.frame.Size.Width = msg.Width
+		m.frame.Size.Height = msg.Height
 
 		// Remove 1 line to render helpText below the panels
-		m.view.Size.Height -= 1
-		if m.view.Size.Height < 0 {
-			m.view.Size.Height = 0
+		m.frame.Size.Height -= 1
+		if m.frame.Size.Height < 0 {
+			m.frame.Size.Height = 0
 		}
 
 		// Since the view size has changed, recompute panels dimensions
-		m.view.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
+		m.frame.SplitPanelsVerticalyByRatio([]float32{0.4, 0.6})
 
 		// Set maximum length for the selector based on the panel's renderable area
-		m.selector.Size.Width = m.view.Panels[0].GetRenderSize().Width
+		m.selector.Size.Width = m.frame.Panels[0].GetRenderSize().Width
 
 		// Limit the selector to the maximum options it can display while fitting in the available space
 		m.selector.Size.Height = m.getLeftPanelOptionListHeight()
@@ -199,7 +199,7 @@ func (m model) getLeftPanelOptionListHeight() int {
 	//
 	// Which is 5 constant lines + how many lines of the list we want to show
 
-	contentSize := m.view.Panels[0].GetRenderSize()
+	contentSize := m.frame.Panels[0].GetRenderSize()
 	h := contentSize.Height - 5
 	if h < 1 {
 		return 1
@@ -212,8 +212,8 @@ func (m model) View() string {
 }
 
 func (m model) ViewOfficial() string {
-	leftPanel := m.view.Panels[0]
-	rightPanel := m.view.Panels[1]
+	leftPanel := m.frame.Panels[0]
+	rightPanel := m.frame.Panels[1]
 
 	leftRenderSize := leftPanel.GetRenderSize()
 	panelsContentHeight := leftRenderSize.Height
