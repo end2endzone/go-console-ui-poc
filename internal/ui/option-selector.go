@@ -1,6 +1,8 @@
-package main
+package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+)
 
 // View holds a collection of panels and its own dimensions.
 type OptionSelector struct {
@@ -93,7 +95,7 @@ func (s *OptionSelector) Render() string {
 
 		// Truncate text if too long
 		maxLen := s.Size.Width - cursorWidth // Account for indicator
-		value = truncateTextWidth(value, maxLen)
+		value = TruncateTextWidth(value, maxLen)
 
 		// Render the cursor
 		cursor := "  "

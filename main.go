@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/end2endzone/go-console-ui-poc/internal/ui"
 )
 
 type Book struct {
@@ -39,8 +40,8 @@ type model struct {
 	searchQuery  string //
 	searching    bool   // Searching mode. When disabled, show "text to explain how to trigger the search mode". When enabled, show the actual text filter.
 	selectedBook *Book  // Selected Book when user presses ENTER
-	frame        Frame
-	selector     OptionSelector
+	frame        ui.Frame
+	selector     ui.OptionSelector
 }
 
 func initialModel() model {
@@ -61,16 +62,16 @@ func initialModel() model {
 
 	m := model{
 		allBooks: books,
-		frame: Frame{
-			Panels: []*Panel{
-				&Panel{},
-				&Panel{},
+		frame: ui.Frame{
+			Panels: []*ui.Panel{
+				&ui.Panel{},
+				&ui.Panel{},
 			},
 		},
 	}
 
 	// Set initial view size
-	m.frame.Size = Size{
+	m.frame.Size = ui.Size{
 		Width:  80,
 		Height: 24,
 	}
@@ -80,7 +81,7 @@ func initialModel() model {
 
 	// Set constant settings for all panels
 	for _, panel := range m.frame.Panels {
-		panel.Padding = Bounds{0, 1, 0, 1}
+		panel.Padding = ui.Bounds{0, 1, 0, 1}
 		panel.MinimumHeight = 6
 	}
 
@@ -305,8 +306,8 @@ func (m model) ViewOfficial() string {
 	}
 
 	// Truncate content if required
-	leftPanel.Content = truncateTextHeight(leftPanel.Content, panelsContentHeight)
-	rightPanel.Content = truncateTextHeight(rightPanel.Content, panelsContentHeight)
+	leftPanel.Content = ui.TruncateTextHeight(leftPanel.Content, panelsContentHeight)
+	rightPanel.Content = ui.TruncateTextHeight(rightPanel.Content, panelsContentHeight)
 
 	// Join both columns
 	columns := lipgloss.JoinHorizontal(
