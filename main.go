@@ -50,6 +50,16 @@ func ReadBooksFromFile(filePath string) ([]Book, error) {
 
 	return books, nil
 }
+
+func getTableColumnsWidth(t table.Model) int {
+	width := 0
+	columns := t.Columns()
+	for _, c := range columns {
+		width += 1 + c.Width + 1 // each column is padded with 1 space. In other words, a 25 characters wide columns is 27 characters long.
+	}
+	return width
+}
+
 func initialModel() model {
 	books, err := ReadBooksFromFile("books.json")
 	if err != nil {
@@ -93,8 +103,8 @@ func initialModel() model {
 }
 
 // Wraps text to fit inside the viewport content area (accounting for scrollbar width)
-func (m model) formatViewportContent(text string) string {
-	viewportWidth := m.viewport.Width - 2 // Space reserved for scrollbar track
+func (m model) formatViewportContent(text string, scrollBarWidth int) string {
+	viewportWidth := m.viewport.Width - scrollBarWidth
 	if viewportWidth <= 0 {
 		viewportWidth = 20
 	}
@@ -105,7 +115,7 @@ func (m model) formatViewportContent(text string) string {
 func (m model) renderViewportWithScrollbar() string {
 	viewportView := m.viewport.View()
 	lines := strings.Split(viewportView, "\n")
-	vpHeight := len(lines)
+	vpHeight := len(lines) // number of line displayed
 
 	if vpHeight == 0 {
 		return viewportView
@@ -119,6 +129,7 @@ func (m model) renderViewportWithScrollbar() string {
 	scrollPercent := m.viewport.ScrollPercent()
 	thumbPos := int(scrollPercent * float64(vpHeight-1))
 
+	// Fix thumbPos if we are at the top most or botto mmost viewport
 	if m.viewport.AtBottom() {
 		thumbPos = vpHeight - 1
 	}
@@ -126,7 +137,7 @@ func (m model) renderViewportWithScrollbar() string {
 		thumbPos = 0
 	}
 
-	// Attach scrollbar character to each line
+	// Attach scrollbar character at the end of each displayed line
 	var output strings.Builder
 	for i, line := range lines {
 		var scrollChar string
@@ -136,8 +147,11 @@ func (m model) renderViewportWithScrollbar() string {
 			scrollChar = trackStyle.Render("│")
 		}
 
+		// Print the line itself and then the scrollbar
 		output.WriteString(fmt.Sprintf("%s %s", line, scrollChar))
-		if i < len(lines)-1 {
+
+		isLast := (i + 1) == len(lines)
+		if !isLast {
 			output.WriteString("\n")
 		}
 	}
@@ -158,39 +172,59 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		headerFooterHeight := 6
-		contentHeight := m.height - headerFooterHeight
-		if contentHeight < 4 {
-			contentHeight = 4
-		}
+		const (
+			minTableItems    = 2
+			minTableHeight   = minTableItems + 2 // a full table height includes 2 line table header
+			minRightWidth    = 20
+			minContentHeight = 6 + minTableItems // for right panel, that is: 2 lines for "Books" header + 2 lines for the table, minTableItems, 2 lines cursor indicator footer
+			scrollBarWidth   = 2                 // For example " █",  note the space before the scroll bar string
+		)
 
-		leftWidth := (m.width / 2) - 4
-		rightWidth := m.width - leftWidth - 6
+		var leftWidth int
+		var rightWidth int
+		var contentHeight int
+		{
+			// Width computation of both panels
+			{
+				tableWidth := getTableColumnsWidth(m.table)
+				leftWidth = tableWidth + 4           // +2 for padding (1 on each side), +2 borders
+				rightWidth = m.width - leftWidth - 4 // don't really know why I need to remove these 4 mandatory spaces but if I don't each line are clipped.
 
-		if leftWidth < 20 {
-			leftWidth = 20
-		}
-		if rightWidth < 20 {
-			rightWidth = 20
-		}
+				if rightWidth < minRightWidth {
+					rightWidth = minRightWidth
+				}
+			}
 
-		tableHeight := contentHeight - 3
-		if tableHeight < 2 {
-			tableHeight = 2
+			// Height computation of both panels
+			{
+				contentHeight = m.height - 4 // 2 lines for the top and bottom borders, 2 lines for the help string (the help string itself and a final \n)
+				if contentHeight < minContentHeight {
+					contentHeight = minContentHeight
+				}
+			}
+
+			// Left panel calculations
+			{
+				tableHeight := contentHeight - 4 // 2 lines for "Books" header + 2 lines cursor indicator footer
+				if tableHeight < minTableHeight {
+					tableHeight = minTableHeight
+				}
+
+				m.table.SetHeight(tableHeight)
+			}
 		}
-		m.table.SetHeight(tableHeight)
 
 		if !m.ready {
-			m.viewport = viewport.New(rightWidth-2, contentHeight-2)
+			m.viewport = viewport.New(rightWidth-scrollBarWidth, contentHeight-2) //right side has a 2 lines non-scrollable header
 			m.ready = true
 		} else {
-			m.viewport.Width = rightWidth - 2
-			m.viewport.Height = contentHeight - 2
+			m.viewport.Width = rightWidth - scrollBarWidth
+			m.viewport.Height = contentHeight - 2 //right side has a 2 lines non-scrollable header
 		}
 
 		cursor := m.table.Cursor()
 		if cursor < len(m.books) {
-			m.viewport.SetContent(m.formatViewportContent(m.books[cursor].Description))
+			m.viewport.SetContent(m.formatViewportContent(m.books[cursor].Description, scrollBarWidth))
 		}
 
 	case tea.KeyMsg:
@@ -214,7 +248,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				cursor := m.table.Cursor()
 				if cursor < len(m.books) {
-					wrappedContent := m.formatViewportContent(m.books[cursor].Description)
+					wrappedContent := m.formatViewportContent(m.books[cursor].Description, 2)
 					m.viewport.SetContent(wrappedContent)
 					m.viewport.GotoTop()
 				}
@@ -265,7 +299,9 @@ func (m model) View() string {
 	leftTitle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("Books")
 	rightTitle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("Description / Summary")
 
-	leftPanel := leftStyle.Render(leftTitle + "\n\n" + m.table.View())
+	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
+
+	leftPanel := leftStyle.Render(leftTitle + "\n\n" + m.table.View() + "\n\n" + positionIndicatorText)
 	rightPanel := rightStyle.Render(rightTitle + "\n\n" + m.renderViewportWithScrollbar())
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
