@@ -4,11 +4,12 @@ import "github.com/charmbracelet/lipgloss"
 
 // View holds a collection of panels and its own dimensions.
 type OptionSelector struct {
-	Values       []string `json:"values"`
-	Size         Size     `json:"size,omitempty"`       // Size of the rendered area
-	CursorIcon   rune     `json:"cursorIcon,omitempty"` // Cursor icon highlighting selected option
-	CursorIndex  int      `json:"cursor,omitempty"`     // Index of selected option in Values
-	scrollOffset int      //`json:"scrollOffset,omitempty"` // For list scrolling subwindow. When all values can not be rendered into the Size area.
+	Options         []any `json:"values"`
+	OptionsRenderer func(any) string
+	Size            Size `json:"size,omitempty"`       // Size of the rendered area
+	CursorIcon      rune `json:"cursorIcon,omitempty"` // Cursor icon highlighting selected option
+	CursorIndex     int  `json:"cursor,omitempty"`     // Index of selected option in Values
+	scrollOffset    int  //`json:"scrollOffset,omitempty"` // For list scrolling subwindow. When all values can not be rendered into the Size area.
 }
 
 func NewOptionSelector() OptionSelector {
@@ -20,7 +21,8 @@ func NewOptionSelector() OptionSelector {
 }
 
 func (s *OptionSelector) Reset() {
-	s.Values = []string{}
+	s.Options = []any{}
+	s.OptionsRenderer = nil
 	s.Size.Width = 0
 	s.Size.Height = 0
 	s.CursorIndex = 0
@@ -28,8 +30,8 @@ func (s *OptionSelector) Reset() {
 }
 
 func (s *OptionSelector) Refresh() {
-	if s.CursorIndex >= len(s.Values) {
-		s.CursorIndex = len(s.Values) - 1
+	if s.CursorIndex >= len(s.Options) {
+		s.CursorIndex = len(s.Options) - 1
 	}
 	if s.CursorIndex < 0 {
 		s.CursorIndex = 0
@@ -54,24 +56,24 @@ func (s *OptionSelector) MoveUp() {
 }
 
 func (s *OptionSelector) MoveDown() {
-	if s.CursorIndex < len(s.Values)-1 {
+	if s.CursorIndex < len(s.Options)-1 {
 		s.CursorIndex++
 	}
 	s.UpdateScrollWindow()
 }
 
-func (s *OptionSelector) GetSelection() string {
+func (s *OptionSelector) GetSelectedOption() any {
 	index := s.CursorIndex
-	if index >= len(s.Values) {
-		index = len(s.Values) - 1
+	if index >= len(s.Options) {
+		index = len(s.Options) - 1
 	}
-	return s.Values[index]
+	return s.Options[index]
 }
 
 func (s *OptionSelector) Render() string {
 	endIdx := s.scrollOffset + s.Size.Height
-	if endIdx > len(s.Values) {
-		endIdx = len(s.Values)
+	if endIdx > len(s.Options) {
+		endIdx = len(s.Options)
 	}
 
 	cursorWidth := 2 // 1 character for the cursor and 1 space after the icon
@@ -79,12 +81,15 @@ func (s *OptionSelector) Render() string {
 	content := ""
 
 	// Render each options.
-	// We skip some options (scrollOffset) if the number of Values exceeds how many value can fit in the rendering area (Size).
-	// We then only render a subwindow of the options Values.
+	// We skip some options (scrollOffset) if the number of options exceeds how many value can fit in the rendering area (Size).
+	// We then only render a subwindow of the options.
 	for i := s.scrollOffset; i < endIdx; i++ {
+		// Get the option displayed value
+		value := s.OptionsRenderer(s.Options[i])
+
 		// Truncate text if too long
 		maxLen := s.Size.Width - cursorWidth // Account for indicator
-		display := truncateTextWidth(s.Values[i], maxLen)
+		display := truncateTextWidth(value, maxLen)
 
 		// If this Books is the selected book...
 		cursor := "  "

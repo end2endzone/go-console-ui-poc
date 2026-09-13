@@ -16,14 +16,26 @@ type Book struct {
 	Description string
 }
 
+func getBookTitle(b any) string {
+	book, ok := b.(Book)
+	if ok {
+		return book.Title
+	}
+
+	bookPtr, ok := b.(*Book)
+	if ok {
+		return bookPtr.Title
+	}
+
+	return "Not-a-book"
+}
+
 // Force model to always implements interface tea.Model
 var _ tea.Model = (*model)(nil)
 
 type model struct {
-	allBooks []Book // These are the Books raw data. This slice is never rendered in the UI.
-	filtered []Book // These are the Books that are rendered. Even when we do not filter, we copy allBooks to filtered. See `applyFilter()` for details.
-	//cursor       int    // Selected Book index in `filtered` list.
-	//scrollOffset int    // For list scrolling subwindow within filtered when too many books can not be rendered into the ui.
+	allBooks     []Book // These are the Books raw data. This slice is never rendered in the UI.
+	filtered     []Book // These are the Books that are rendered. Even when we do not filter, we copy allBooks to filtered. See `applyFilter()` for details.
 	searchQuery  string //
 	searching    bool   // Searching mode. When disabled, show "text to explain how to trigger the search mode". When enabled, show the actual text filter.
 	selectedBook *Book  // Selected Book when user presses ENTER
@@ -78,6 +90,7 @@ func initialModel() model {
 	m.applyFilter()
 
 	m.selector.CursorIcon = '>'
+	m.selector.OptionsRenderer = getBookTitle
 
 	return m
 }
@@ -97,10 +110,11 @@ func (m *model) applyFilter() {
 		}
 	}
 
-	// Copy filtered books titles to selector
-	m.selector.Values = []string{}
-	for _, book := range m.filtered {
-		m.selector.Values = append(m.selector.Values, book.Title)
+	// Populate the 'any' options slice of the selector with *Book instances.
+	m.selector.Options = make([]any, len(m.filtered))
+	for i := range m.filtered {
+		bookPtr := &m.filtered[i]
+		m.selector.Options[i] = bookPtr
 	}
 
 	// Refresh cursor/scroll bounds if filtered list shrunk
@@ -261,20 +275,13 @@ func (m model) ViewOfficial() string {
 	if len(m.filtered) == 0 {
 		leftPanel.Content += noResultFoundStyle.Render("No results found")
 	} else {
-		// Adjust dynamic vertical scroll window (offset tracking)
-		//m.selector.UpdateScrollWindow()
-
-		// Debug
-		//m.selector.Values[4] = fmt.Sprintf("CursorIndex=%d   ", m.selector.CursorIndex)
-		//m.selector.Values[5] = fmt.Sprintf("scrollOffset=%d   ", m.selector.scrollOffset)
-
 		// Render the selector
 		leftPanel.Content += m.selector.Render()
 
 		// Render a scroll indicator hint if more options exist than want can be displayed
-		if len(m.selector.Values) > m.selector.Size.Height {
+		if len(m.selector.Options) > m.selector.Size.Height {
 			style := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-			text := fmt.Sprintf(" [%d/%d]", m.selector.CursorIndex+1, len(m.selector.Values))
+			text := fmt.Sprintf(" [%d/%d]", m.selector.CursorIndex+1, len(m.selector.Options))
 			leftPanel.Content += "\n" + style.Render(text)
 		}
 	}
