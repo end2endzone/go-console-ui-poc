@@ -89,8 +89,12 @@ func initialModel() model {
 
 	m.applyFilter()
 
-	m.selector.CursorIcon = '>'
+	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+	selectionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true).Underline(true)
 	m.selector.OptionsRenderer = getBookTitle
+	m.selector.CursorIcon = '>'
+	m.selector.CursorStyle = &cursorStyle
+	m.selector.SelectionStyle = &selectionStyle
 
 	return m
 }

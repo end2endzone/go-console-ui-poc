@@ -9,6 +9,8 @@ type OptionSelector struct {
 	Size            Size             `json:"size,omitempty"`       // Size of the rendered area
 	CursorIcon      rune             `json:"cursorIcon,omitempty"` // Cursor icon highlighting selected option
 	CursorIndex     int              `json:"cursor,omitempty"`     // Index of selected option in Values
+	CursorStyle     *lipgloss.Style  ``                            // An optional rendering style for the cursor icon
+	SelectionStyle  *lipgloss.Style  ``                            // An optional rendering style for the selected option
 	scrollOffset    int              //`json:"scrollOffset,omitempty"` // For list scrolling subwindow. When all values can not be rendered into the Size area.
 }
 
@@ -84,23 +86,32 @@ func (s *OptionSelector) Render() string {
 	// We skip some options (scrollOffset) if the number of options exceeds how many value can fit in the rendering area (Size).
 	// We then only render a subwindow of the options.
 	for i := s.scrollOffset; i < endIdx; i++ {
+		// Render the option's display value
+
 		// Get the option displayed value
 		value := s.OptionsRenderer(s.Options[i])
 
 		// Truncate text if too long
 		maxLen := s.Size.Width - cursorWidth // Account for indicator
-		display := truncateTextWidth(value, maxLen)
+		value = truncateTextWidth(value, maxLen)
 
-		// If this Books is the selected book...
+		// Render the cursor
 		cursor := "  "
+
+		// If this option is the selected option...
 		if s.CursorIndex == i {
-			// Set the selected cursor & colorize with a style this book's title
-			style := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true)
-			cursor = style.Render((string)(s.CursorIcon) + " ")
+			if s.CursorStyle != nil {
+				// Override the selected cursor text and colorize with the configured style
+				cursor = s.CursorStyle.Render((string)(s.CursorIcon)) + " "
+			}
+			if s.SelectionStyle != nil {
+				// Override the selected displayed value text and colorize with the configured style
+				value = s.SelectionStyle.Render(value)
+			}
 		}
 
-		// Render the Book
-		content += cursor + display + "\n"
+		// Render the option's display value
+		content += cursor + value + "\n"
 	}
 
 	style := lipgloss.NewStyle().
