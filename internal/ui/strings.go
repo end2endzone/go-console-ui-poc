@@ -1,4 +1,4 @@
-package main
+package ui
 
 import "strings"
 
@@ -29,8 +29,8 @@ func StringsIndexN(s, substr string, n int) int {
 	return currentIndex
 }
 
-// truncateTextWidth Truncates text with trailing ellipsis to fit a given maximum length.
-func truncateTextWidth(text string, maxLen int) string {
+// TruncateTextWidth Truncates text with trailing ellipsis to fit a given maximum length.
+func TruncateTextWidth(text string, maxLen int) string {
 	if maxLen <= 3 {
 		return "..."
 	}
@@ -41,8 +41,8 @@ func truncateTextWidth(text string, maxLen int) string {
 	return text
 }
 
-// truncateTextHeight Truncates text with trailing ellipsis to fit a given maximum number of lines.
-func truncateTextHeight(text string, maxHeight int) string {
+// TruncateTextHeight Truncates text with trailing ellipsis to fit a given maximum number of lines.
+func TruncateTextHeight(text string, maxHeight int) string {
 	if maxHeight <= 1 {
 		return "[...]"
 	}
