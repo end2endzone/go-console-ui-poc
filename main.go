@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -11,10 +12,10 @@ import (
 )
 
 type Book struct {
-	Title       string
-	Author      string
-	Year        int
-	Description string
+	Title       string `json:"title"`
+	Author      string `json:"author"`
+	Year        int    `json:"year"`
+	Description string `json:"description"`
 }
 
 func getBookTitle(b any) string {
@@ -44,20 +45,28 @@ type model struct {
 	selector     ui.OptionSelector
 }
 
+// ReadBooksFromFile reads a JSON file and parses it into a slice of Books.
+func ReadBooksFromFile(filePath string) ([]Book, error) {
+	// Read the raw bytes from the file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Unmarshal the JSON array into a slice of Book structs
+	var books []Book
+	err = json.Unmarshal(data, &books)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	return books, nil
+}
+
 func initialModel() model {
-	books := []Book{
-		{"The Go Programming Language", "Alan A. A. Donovan & Brian W. Kernighan", 2015, "The authoritative resource for learning Go."},
-		{"Concurrency in Go", "Katherine Cox-Buday", 2017, "Tools and techniques for developers looking to master concurrent code."},
-		{"Learning Go", "Jon Bodner", 2021, "An idiomatic guide to real-world Go programming."},
-		{"Go in Action", "William Kennedy", 2015, "An introduction to Go focusing on practical application development."},
-		{"Head First Go", "Jay McGavren", 2019, "A brain-friendly guide to learning Go."},
-		{"100 Go Mistakes and How to Avoid Them", "Tevfik Kazi", 2022, "Avoid common pitfalls and write cleaner Go code."},
-		{"Designing Data-Intensive Applications", "Martin Kleppmann", 2017, "Deep dive into distributed systems architectures."},
-		{"Clean Code", "Robert C. Martin", 2008, "A handbook of agile software craftsmanship."},
-		{"The Pragmatic Programmer", "David Thomas & Andrew Hunt", 2019, "Your journey to mastery in software development."},
-		{"Refactoring", "Martin Fowler", 2018, "Improving the design of existing code."},
-		{"Domain-Driven Design", "Eric Evans", 2003, "Tackling complexity in the heart of software."},
-		{"Building Microservices", "Sam Newman", 2021, "Designing fine-grained systems."},
+	books, err := ReadBooksFromFile("books.json")
+	if err != nil {
+		panic(err)
 	}
 
 	m := model{
