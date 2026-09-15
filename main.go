@@ -160,13 +160,26 @@ func initialModel() model {
 	}
 }
 
+// onSelectedBookChanged refreshes the current model's UI elements when the user changes the current selected book in the table in the left panel.
+func (m *model) onSelectedBookChanged() {
+	cursor := m.table.Cursor()
+	if cursor < len(m.books) {
+		description := m.books[cursor].Description
+		wrappedContent := m.formatViewportContent(description)
+		m.viewport.SetContent(wrappedContent)
+	}
+}
+
 // Wraps text to fit inside the viewport content area.
 // The function shinks text by scrollBarWidth characters to reserve space for the scrollbar string at the end of each line.
-func (m model) formatViewportContent(text string) string {
+func (m *model) formatViewportContent(text string) string {
 	textWithoutScrollBarWidth := m.viewport.Width - scrollBarWidth
+
+	// Check for minimum length size
 	if textWithoutScrollBarWidth < minViewportTextWidth {
 		textWithoutScrollBarWidth = minViewportTextWidth
 	}
+
 	wrappedContent := lipgloss.NewStyle().Width(textWithoutScrollBarWidth).Render(text)
 
 	//DEBUG
@@ -176,8 +189,8 @@ func (m model) formatViewportContent(text string) string {
 	return wrappedContent
 }
 
-// Renders the viewport content side-by-side with a vertical dynamic scrollbar
-func (m model) renderViewportWithScrollbar() string {
+// Renders the current model's viewport content side-by-side with a vertical dynamic scrollbar.
+func (m *model) renderViewportWithScrollbar() string {
 	// Render viewport content normally.
 
 	// Even if we already called SetContent() to trim the content to 2 characters less than the width of the viewport,
@@ -330,12 +343,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		//	"",
 		//}
 
-		cursor := m.table.Cursor()
-		if cursor < len(m.books) {
-			description := m.books[cursor].Description
-			wrappedContent := m.formatViewportContent(description)
-			m.viewport.SetContent(wrappedContent)
-		}
+		// The right viewport dimensions have changed.
+		// Force updating the right viewport with new automatically wrapped content.
+		m.onSelectedBookChanged()
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -356,13 +366,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.table, cmd = m.table.Update(msg)
 				cmds = append(cmds, cmd)
 
-				cursor := m.table.Cursor()
-				if cursor < len(m.books) {
-					description := m.books[cursor].Description
-					wrappedContent := m.formatViewportContent(description)
-					m.viewport.SetContent(wrappedContent)
-					m.viewport.GotoTop()
-				}
+				// The selected book have changed.
+				// Force updating the right viewport with new automatically wrapped content.
+				m.onSelectedBookChanged()
+
+				// And move the viewport to the top of the view
+				m.viewport.GotoTop()
+
 				return m, tea.Batch(cmds...)
 			} else {
 				m.viewport, cmd = m.viewport.Update(msg)
@@ -408,7 +418,7 @@ func (m model) View() string {
 		Padding(0, 1)
 
 	leftTitle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("Books")
-	rightTitle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("hi!")
+	rightTitle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("Summary")
 
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
 
