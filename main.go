@@ -33,6 +33,21 @@ type model struct {
 	height      int
 }
 
+// Theme display constants
+const (
+	leftRightBorderWidth  = 1
+	leftRightPaddingWidth = 1
+	scrollBarWidth        = 2                                     // For example " █", note the space before the scroll bar cursor
+	minTableItems         = 2                                     // Minimum number of data rows (excluding table's header rows)
+	minTableHeight        = minTableItems + 2                     // A full table height includes 2 line table header
+	minContentHeight      = 6 + minTableItems                     // For right panel, that is: 2 lines for "Books" header + 2 lines for the table, minTableItems, 2 lines cursor indicator footer
+	minViewportTextWidth  = 1                                     // Minimum width of the text (exclusing the scroll bars characters)
+	minRightViewportWidth = minViewportTextWidth + scrollBarWidth // 1 character wide + scroll bar
+	minRightWidth         = minRightViewportWidth +
+		2*leftRightBorderWidth +
+		2*leftRightPaddingWidth // 2 characters for border, 2 characters for padding
+)
+
 // ReadBooksFromFile reads a JSON file and parses it into a slice of Books.
 func ReadBooksFromFile(filePath string) ([]Book, error) {
 	// Read the raw bytes from the file
@@ -147,8 +162,7 @@ func initialModel() model {
 
 // Wraps text to fit inside the viewport content area.
 // The function shinks text by scrollBarWidth characters to reserve space for the scrollbar string at the end of each line.
-func (m model) formatViewportContent(text string, scrollBarWidth int) string {
-	const minViewportTextWidth = 1
+func (m model) formatViewportContent(text string) string {
 	textWithoutScrollBarWidth := m.viewport.Width - scrollBarWidth
 	if textWithoutScrollBarWidth < minViewportTextWidth {
 		textWithoutScrollBarWidth = minViewportTextWidth
@@ -163,7 +177,7 @@ func (m model) formatViewportContent(text string, scrollBarWidth int) string {
 }
 
 // Renders the viewport content side-by-side with a vertical dynamic scrollbar
-func (m model) renderViewportWithScrollbar(scrollBarWidth int) string {
+func (m model) renderViewportWithScrollbar() string {
 	// Render viewport content normally.
 
 	// Even if we already called SetContent() to trim the content to 2 characters less than the width of the viewport,
@@ -239,19 +253,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		const (
-			leftRightBorderWidth  = 1
-			leftRightPaddingWidth = 1
-			scrollBarWidth        = 2                  // For example " █", note the space before the scroll bar cursor
-			minTableItems         = 2                  // Minimum number of data rows (excluding table's header rows)
-			minTableHeight        = minTableItems + 2  // A full table height includes 2 line table header
-			minContentHeight      = 6 + minTableItems  // For right panel, that is: 2 lines for "Books" header + 2 lines for the table, minTableItems, 2 lines cursor indicator footer
-			minRightViewportWidth = 1 + scrollBarWidth // 1 character wide + scroll bar
-			minRightWidth         = minRightViewportWidth +
-				2*leftRightBorderWidth +
-				2*leftRightPaddingWidth // 2 characters for border, 2 characters for padding
-		)
-
 		var leftWidth int
 		var rightWidth int
 		var contentHeight int
@@ -286,7 +287,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					tableHeight = minTableHeight
 				}
 
-				//// Debuging code to auto-shrink the table to match a target leftWidth value ?
+				//// Debuging code to auto-shrink the table to match a targetted leftWidth ?
+				//// This makes the table width responsive based on available screen width.
 				//if len(m.table.Columns()) == 3 {
 				//	ShrinkTableLastColumn(&m.table)
 				//	ShrinkTableLastColumn(&m.table)
@@ -331,7 +333,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cursor := m.table.Cursor()
 		if cursor < len(m.books) {
 			description := m.books[cursor].Description
-			wrappedContent := m.formatViewportContent(description, scrollBarWidth)
+			wrappedContent := m.formatViewportContent(description)
 			m.viewport.SetContent(wrappedContent)
 		}
 
@@ -357,7 +359,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cursor := m.table.Cursor()
 				if cursor < len(m.books) {
 					description := m.books[cursor].Description
-					wrappedContent := m.formatViewportContent(description, 2)
+					wrappedContent := m.formatViewportContent(description)
 					m.viewport.SetContent(wrappedContent)
 					m.viewport.GotoTop()
 				}
@@ -411,7 +413,7 @@ func (m model) View() string {
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
 
 	leftPanel := leftStyle.Render(leftTitle + "\n\n" + m.table.View() + "\n\n" + positionIndicatorText)
-	rightPanel := rightStyle.Render(rightTitle + "\n\n" + m.renderViewportWithScrollbar(2))
+	rightPanel := rightStyle.Render(rightTitle + "\n\n" + m.renderViewportWithScrollbar())
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
