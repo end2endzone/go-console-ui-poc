@@ -102,6 +102,9 @@ func setRenderedTextLineValue(text *string, linenumber int, value string) {
 	*text = strings.Join(lines, "\n")
 }
 
+// ShrinkTableLastColumn removes the last column of the given table.
+// The function can be used to auto-shrink a table (hide non-important columns) to match a targetted width.
+// This allows a tables to be "responsive" and react dynamically based on available screen width.
 func ShrinkTableLastColumn(t *table.Model) {
 	// First remove the last column in rows.
 	// Without this, there is an index out of range runtime error.
@@ -182,10 +185,6 @@ func (m *model) formatViewportContent(text string) string {
 
 	wrappedContent := lipgloss.NewStyle().Width(textWithoutScrollBarWidth).Render(text)
 
-	//DEBUG
-	//maxTextLength := getRenderedTextMaximumWidth(wrappedContent)
-	//setRenderedTextLineValue(&wrappedContent, 4, fmt.Sprintf("MTL-1=%d", maxTextLength))
-
 	return wrappedContent
 }
 
@@ -201,11 +200,6 @@ func (m *model) renderViewportWithScrollbar() string {
 	m.viewport.Width -= scrollBarWidth
 	viewportView := m.viewport.View()
 	m.viewport.Width += scrollBarWidth
-
-	//DEBUG
-	//maxTextLength := getRenderedTextMaximumWidth(viewportView)
-	//setRenderedTextLineValue(&viewportView, 5, fmt.Sprintf("MTL-2=%d", maxTextLength))
-	//setRenderedTextLineValue(&viewportView, 6, fmt.Sprintf("vp.w=%d", m.viewport.Width))
 
 	// Split by line to be able to manipulate lines individually
 	lines := strings.Split(viewportView, "\n")
@@ -280,9 +274,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if rightWidth < minRightWidth {
 					rightWidth = minRightWidth
 				}
-
-				//DEBUG
-				//rightWidth = 15
 			}
 
 			// Height computation of both panels
@@ -299,13 +290,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if tableHeight < minTableHeight {
 					tableHeight = minTableHeight
 				}
-
-				//// Debuging code to auto-shrink the table to match a targetted leftWidth ?
-				//// This makes the table width responsive based on available screen width.
-				//if len(m.table.Columns()) == 3 {
-				//	ShrinkTableLastColumn(&m.table)
-				//	ShrinkTableLastColumn(&m.table)
-				//}
 
 				// Leave table's width to default value 0 so that is uses the minimum required width
 				m.table.SetHeight(tableHeight)
@@ -324,24 +308,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.Width = rightViewportWidth
 			m.viewport.Height = contentHeight - 2 //right side has a 2 lines non-scrollable header
 		}
-
-		//DEBUG
-		//_, right, _, left := m.viewport.Style.GetPadding()
-		//m.table.Rows()[0] = table.Row{
-		//	fmt.Sprintf("rightViewportWidth=%d", rightViewportWidth),
-		//	fmt.Sprintf("rightWidth=%d", rightWidth),
-		//	"",
-		//}
-		//m.table.Rows()[2] = table.Row{
-		//	fmt.Sprintf("minRightViewportWidth=%d", minRightViewportWidth),
-		//	fmt.Sprintf("minRightWidth=%d", minRightWidth),
-		//	"",
-		//}
-		//m.table.Rows()[1] = table.Row{
-		//	fmt.Sprintf("padding: %d,%d", right, left),
-		//	"",
-		//	"",
-		//}
 
 		// The right viewport dimensions have changed.
 		// Force updating the right viewport with new automatically wrapped content.
