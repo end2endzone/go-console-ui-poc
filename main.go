@@ -35,7 +35,15 @@ const (
 	SearchText                           // 3
 )
 
+type theme struct {
+	focusedBorderColor   lipgloss.Color
+	unfocusedBorderColor lipgloss.Color
+	panelsPadding        []int
+	headerTextStyle      lipgloss.Style
+}
+
 type model struct {
+	theme           theme
 	books           []Book
 	filteredBooks   []*Book
 	table           table.Model
@@ -61,6 +69,17 @@ const (
 		2*leftRightBorderWidth +
 		2*leftRightPaddingWidth // 2 characters for border, 2 characters for padding
 )
+
+func NewTheme() theme {
+	theme := theme{
+		focusedBorderColor:   lipgloss.Color("63"),
+		unfocusedBorderColor: lipgloss.Color("240"),
+		panelsPadding:        []int{0, 1, 0, 1}, // top, right, bottom, left
+		headerTextStyle:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")),
+	}
+
+	return theme
+}
 
 // ReadBooksFromFile reads a JSON file and parses it into a slice of Books.
 func ReadBooksFromFile(filePath string) ([]Book, error) {
@@ -228,6 +247,7 @@ func initialModel() model {
 	searchText.Width = 40
 
 	m := model{
+		theme:      NewTheme(),
 		books:      books,
 		table:      t,
 		searchText: searchText,
@@ -623,34 +643,32 @@ func (m model) View() string {
 	// Get current component
 	activeComponent := m.ActiveComponent()
 
-	// Define colors for left and right borders
-	unfocusedBorderColor := lipgloss.Color("240")
-	focusedBorderColor := lipgloss.Color("63")
+	// Define colors for left and right borders.
 	// Set both borders as unfocused by default
-	leftBorderColor := unfocusedBorderColor
-	rightBorderColor := unfocusedBorderColor
+	leftBorderColor := m.theme.unfocusedBorderColor
+	rightBorderColor := m.theme.unfocusedBorderColor
 	// Set active border to the focused style
 	switch activeComponent {
 	case LeftTable, SearchText:
-		leftBorderColor = focusedBorderColor
+		leftBorderColor = m.theme.focusedBorderColor
 	case RightViewport:
-		rightBorderColor = focusedBorderColor
+		fallthrough
 	default:
-		rightBorderColor = focusedBorderColor
+		rightBorderColor = m.theme.focusedBorderColor
 	}
 
 	leftStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(leftBorderColor).
-		Padding(0, 1)
+		Padding(m.theme.panelsPadding...)
 
 	rightStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(rightBorderColor).
-		Padding(0, 1)
+		Padding(m.theme.panelsPadding...)
 
-	leftTitle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("Books")
-	rightTitle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("Summary")
+	leftTitle := m.theme.headerTextStyle.Render("Books")
+	rightTitle := m.theme.headerTextStyle.Render("Summary")
 
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
 
