@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+
+	//"charm.land/bubbles/v2/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -23,14 +26,25 @@ type Book struct {
 // Force model to always implements interface tea.Model
 var _ tea.Model = (*model)(nil)
 
+type ActiveComponent int
+
+const (
+	Unknown       ActiveComponent = iota // 0
+	LeftTable                            // 1
+	RightViewport                        // 2
+	SearchText                           // 3
+)
+
 type model struct {
-	books       []Book
-	table       table.Model
-	viewport    viewport.Model
-	activePanel int // 0 = Left (Table), 1 = Right (Viewport)
-	ready       bool
-	width       int
-	height      int
+	books           []Book
+	filteredBooks   []*Book
+	table           table.Model
+	viewport        viewport.Model
+	viewportFocused bool
+	searchText      textinput.Model
+	ready           bool
+	width           int
+	height          int
 }
 
 // Theme display constants
@@ -121,6 +135,64 @@ func ShrinkTableLastColumn(t *table.Model) {
 	t.SetColumns(columns)
 }
 
+// FindBookIndex finds the given book in the given list of books
+// Returns the index where the book is found
+// Returns -1 if the book is not found
+func FindBookIndex(query *Book, books []*Book) int {
+	for i := range books {
+		tmp := books[i]
+		if query == tmp {
+			return i
+		}
+	}
+	return -1
+}
+
+func TruncatValueAsPerTableColumn(value string, table table.Model, columnIdx int) string {
+	columns := table.Columns()
+
+	// Assert columnIdx not out of range
+	if columnIdx < 0 || columnIdx >= len(columns) {
+		err := fmt.Errorf("invalid column index %d on a table with %d columns", columnIdx, len(columns))
+		panic(err)
+	}
+
+	column := columns[columnIdx]
+
+	width := column.Width
+	substring := value[0:min(len(value), width)]
+
+	// It is truncated? For example "Harry Potter and the Phi…"
+	if len(substring) == width {
+		// Potentially truncated.
+		if len(value) > len(substring) {
+			// Yes it is
+			substring = value[0:width-1] + "…"
+		}
+	}
+
+	return substring
+}
+
+func hasBookChanged(before *Book, after *Book) bool {
+	if before == nil && after == nil {
+		return false
+	}
+
+	if before == nil && after != nil {
+		return true
+	} else if before != nil && after == nil {
+		return true
+	}
+
+	// Both books instance are non-nil
+	if before.Title == after.Title {
+		return false
+	}
+
+	return true
+}
+
 func initialModel() model {
 	books, err := ReadBooksFromFile("books.json")
 	if err != nil {
@@ -133,14 +205,8 @@ func initialModel() model {
 		{Title: "Year", Width: 4},
 	}
 
-	rows := make([]table.Row, len(books))
-	for i, b := range books {
-		rows[i] = table.Row{b.Title, b.Author, strconv.Itoa(b.Year)}
-	}
-
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
 		table.WithFocused(true),
 	)
 
@@ -156,20 +222,130 @@ func initialModel() model {
 		Bold(true)
 	t.SetStyles(s)
 
-	return model{
-		books:       books,
-		table:       t,
-		activePanel: 0,
+	searchText := textinput.New()
+	searchText.Placeholder = "filter"
+	searchText.CharLimit = 156
+	searchText.Width = 40
+
+	m := model{
+		books:      books,
+		table:      t,
+		searchText: searchText,
 	}
+
+	m.FocusComponent(LeftTable)
+
+	// Fill Table
+	m.FillBooksTable("")
+
+	return m
+}
+
+// ActiveComponent return the active focused component in the main UI.
+func (m *model) ActiveComponent() ActiveComponent {
+	if m.table.Focused() {
+		return LeftTable
+	} else if m.viewportFocused {
+		return RightViewport
+	} else if m.searchText.Focused() {
+		return SearchText
+	}
+
+	return Unknown
+}
+
+// FocusComponent focuses the given component and blur other components.
+func (m *model) FocusComponent(c ActiveComponent) {
+	switch c {
+	case LeftTable:
+		m.table.Focus()
+		m.viewportFocused = false
+		m.searchText.Blur()
+	case RightViewport:
+		m.table.Blur()
+		m.viewportFocused = true
+		m.searchText.Blur()
+	case SearchText:
+		m.table.Blur()
+		m.viewportFocused = false
+		m.searchText.Focus()
+	default:
+		m.table.Blur()
+		m.viewportFocused = false
+		m.searchText.Blur()
+	}
+}
+
+// SelectedBook returns the current Book selected in the left table.
+// Returns nil if no book is selected.
+func (m *model) SelectedBook() *Book {
+	cursor := m.table.Cursor()
+	if cursor >= 0 && cursor < len(m.filteredBooks) {
+		book := m.filteredBooks[cursor]
+		return book
+	}
+	return nil
 }
 
 // onSelectedBookChanged refreshes the current model's UI elements when the user changes the current selected book in the table in the left panel.
 func (m *model) onSelectedBookChanged() {
-	cursor := m.table.Cursor()
-	if cursor < len(m.books) {
-		description := m.books[cursor].Description
+	bookPtr := m.SelectedBook()
+	if bookPtr != nil {
+		description := bookPtr.Description
 		wrappedContent := m.formatViewportContent(description)
 		m.viewport.SetContent(wrappedContent)
+	} else {
+		// There is no book selected, clear the right panel content
+		m.viewport.SetContent("")
+	}
+}
+
+// onFilterChanged refreshes the current model's UI elements when the user changes the current filter.
+func (m *model) onFilterChanged() {
+
+	previousBookPtr := m.SelectedBook()
+
+	// Rebuild the books left table
+	filter := m.searchText.Value()
+	m.FillBooksTable(filter)
+
+	// Try to restore the previous selection
+	if previousBookPtr != nil {
+		// Search for the previous book in the new selection
+		index := FindBookIndex(previousBookPtr, m.filteredBooks)
+		if index != -1 {
+			// The new index matching the same previous books is found
+			m.table.SetCursor(index)
+
+			// Fix a specific bug:
+			truncatedTitle := TruncatValueAsPerTableColumn(previousBookPtr.Title, m.table, 0)
+			content := m.table.View()
+			if !strings.Contains(content, truncatedTitle) {
+				// This is a bug where even if we forced the SetCursor() to properly select our value,
+				// the table's viewport does not update properly to show our selected value.
+
+				// Try to fix the issue in a dirty way
+				m.table.MoveUp(1)
+				m.table.MoveDown(1)
+
+				// and test again
+				content := m.table.View()
+				if !strings.Contains(content, truncatedTitle) {
+					err := fmt.Errorf("The selected book named '%s' is selected but not in the table's internal viewport!\n"+
+						"The table's output is the following:\n%s", previousBookPtr.Title, content)
+
+					panic(err)
+				}
+			}
+		}
+
+		// Force the right panel to update for one of the following reasons:
+		// 1. The previous element is found so we called m.table.SetCursor(). But the m.table.SetRows() in FillBooksTable() has resetted the selection to 0 and also resetted the right panel content.
+		// 2. The previous element is not found anymore. We got a new selection.
+		// 3. The previous element is not found anymore. There is no result that matches the search pattern. The table is empty
+
+		// Refresh the right panel
+		m.onSelectedBookChanged()
 	}
 }
 
@@ -247,6 +423,55 @@ func (m *model) renderViewportWithScrollbar() string {
 	return output.String()
 }
 
+// FilterBooks filters the list of books based on the given filter
+func (m *model) FilterBooks(filter string) []*Book {
+	// Filter using case unsensitive
+	filter = strings.ToLower(filter)
+
+	filteredBooks := []*Book{}
+	for i, b := range m.books {
+		if strings.Contains(strings.ToLower(b.Title), filter) ||
+			strings.Contains(strings.ToLower(b.Author), filter) {
+			filteredBooks = append(filteredBooks, &m.books[i])
+		}
+	}
+	return filteredBooks
+}
+
+// FillBooksTable updates the left table's rows based on the given filter
+func (m *model) FillBooksTable(filter string) {
+	var filteredBooks []*Book
+	var rows []table.Row
+
+	if len(filter) <= 1 {
+		// No filter specified or filter too small and ignored
+		filteredBooks = make([]*Book, len(m.books))
+		rows = make([]table.Row, len(m.books))
+		for i := range m.books {
+			bookPtr := &m.books[i]
+			filteredBooks[i] = bookPtr
+			rows[i] = table.Row{bookPtr.Title, bookPtr.Author, strconv.Itoa(bookPtr.Year)}
+		}
+	} else {
+		// Filter the list based on the filter
+		filteredBooks = m.FilterBooks(filter)
+		rows = make([]table.Row, len(filteredBooks))
+		for i, b := range filteredBooks {
+			rows[i] = table.Row{b.Title, b.Author, strconv.Itoa(b.Year)}
+		}
+	}
+
+	// Apply
+	m.filteredBooks = filteredBooks
+	m.table.SetRows(rows)
+
+	// Note that cursor is modified by the table when we change the rows
+	m.table.SetCursor(0) // force first element to be selected
+
+	// Force the right panel to update to the selection (or "unselection").
+	m.onSelectedBookChanged()
+}
+
 func (m model) Init() tea.Cmd {
 	return nil
 }
@@ -254,6 +479,9 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+
+	// Get current component
+	activeComponent := m.ActiveComponent()
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -278,7 +506,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Height computation of both panels
 			{
-				contentHeight = m.height - 4 // 2 lines for the top and bottom borders, 2 lines for the help string (the help string itself and a final \n)
+				contentHeight = m.height - 5 // 2 lines for the top and bottom borders, 1 search line, 2 lines for the help string (the help string itself and a final \n)
 				if contentHeight < minContentHeight {
 					contentHeight = minContentHeight
 				}
@@ -315,45 +543,73 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "q":
+			if activeComponent != SearchText {
+				// only allow q to quit when its not the search string that has focus
+				return m, tea.Quit
+			}
+		case "esc", "ctrl+c":
 			return m, tea.Quit
 
-		case "tab", "right", "left":
-			if m.activePanel == 0 {
-				m.activePanel = 1
-				m.table.Blur()
-			} else {
-				m.activePanel = 0
-				m.table.Focus()
+		case "tab":
+			// Focus the next component
+			switch activeComponent {
+			case LeftTable:
+				m.FocusComponent(RightViewport)
+			case RightViewport:
+				m.FocusComponent(SearchText)
+			case SearchText:
+				m.FocusComponent(LeftTable)
+			default:
+				m.FocusComponent(LeftTable)
 			}
-
-		case "up", "down", "j", "k":
-			if m.activePanel == 0 {
-				m.table, cmd = m.table.Update(msg)
-				cmds = append(cmds, cmd)
-
-				// The selected book have changed.
-				// Force updating the right viewport with new automatically wrapped content.
-				m.onSelectedBookChanged()
-
-				// And move the viewport to the top of the view
-				m.viewport.GotoTop()
-
-				return m, tea.Batch(cmds...)
-			} else {
-				m.viewport, cmd = m.viewport.Update(msg)
-				cmds = append(cmds, cmd)
-				return m, tea.Batch(cmds...)
+		case "right", "left":
+			// Quickly change from between left and right panels
+			switch activeComponent {
+			case LeftTable:
+				m.FocusComponent(RightViewport)
+			case RightViewport:
+				m.FocusComponent(LeftTable)
 			}
 		}
 	}
 
-	if m.activePanel == 0 {
+	// The message was not consumed by previous code.
+	// Delegate the msg to the active panel
+	switch activeComponent {
+	case LeftTable:
+		previousBookPtr := m.SelectedBook()
+
 		m.table, cmd = m.table.Update(msg)
 		cmds = append(cmds, cmd)
-	} else {
+
+		// Check if the selected book has changed
+		newBookPtr := m.SelectedBook()
+		if hasBookChanged(previousBookPtr, newBookPtr) {
+			// The selected book have changed.
+			// Force updating the right viewport with new automatically wrapped content.
+			m.onSelectedBookChanged()
+
+			// And move the right viewport to the top of the view
+			m.viewport.GotoTop()
+		}
+	case RightViewport:
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
+	case SearchText:
+		previousFilter := m.searchText.Value()
+
+		m.searchText, cmd = m.searchText.Update(msg)
+		cmds = append(cmds, cmd)
+
+		newFilter := m.searchText.Value()
+
+		// If the filter has changed
+		if previousFilter != newFilter {
+			m.onFilterChanged()
+		}
+
+	default:
 	}
 
 	return m, tea.Batch(cmds...)
@@ -364,13 +620,23 @@ func (m model) View() string {
 		return "Initializing UI..."
 	}
 
-	leftBorderColor := lipgloss.Color("240")
-	rightBorderColor := lipgloss.Color("240")
+	// Get current component
+	activeComponent := m.ActiveComponent()
 
-	if m.activePanel == 0 {
-		leftBorderColor = lipgloss.Color("63")
-	} else {
-		rightBorderColor = lipgloss.Color("63")
+	// Define colors for left and right borders
+	unfocusedBorderColor := lipgloss.Color("240")
+	focusedBorderColor := lipgloss.Color("63")
+	// Set both borders as unfocused by default
+	leftBorderColor := unfocusedBorderColor
+	rightBorderColor := unfocusedBorderColor
+	// Set active border to the focused style
+	switch activeComponent {
+	case LeftTable, SearchText:
+		leftBorderColor = focusedBorderColor
+	case RightViewport:
+		rightBorderColor = focusedBorderColor
+	default:
+		rightBorderColor = focusedBorderColor
 	}
 
 	leftStyle := lipgloss.NewStyle().
@@ -393,11 +659,14 @@ func (m model) View() string {
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
+	searchLabel := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ")
+	searchLabel += " " + m.searchText.View()
+
 	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
-		" Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",
+		"Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",
 	)
 
-	return body + "\n" + help + "\n"
+	return body + "\n" + searchLabel + "\n" + help + "\n"
 }
 
 func main() {
