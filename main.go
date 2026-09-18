@@ -14,6 +14,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/end2endzone/go-console-ui-poc/internal/layout"
 )
 
 type Book struct {
@@ -51,6 +53,7 @@ type model struct {
 	viewportFocused bool
 	searchText      textinput.Model
 	ready           bool
+	rects           map[string]layout.Rect
 	width           int
 	height          int
 }
@@ -210,6 +213,23 @@ func hasBookChanged(before *Book, after *Book) bool {
 	}
 
 	return true
+}
+
+// tree describes the layout once. It never changes at runtime — only the
+// width/height passed to layout.Resolve changes, on every WindowSizeMsg.
+func tree() *layout.Node {
+	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
+		layout.Col(layout.SizeSpec{Fixed: 30}, // column 1: fixed 30 cols wide
+			layout.Leaf("top", layout.SizeSpec{Fixed: 3}),   // fixed height
+			layout.Leaf("bottom", layout.SizeSpec{Grow: 1}), // fills remaining height
+		),
+		layout.Leaf("right", layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
+	)
+}
+
+// panel renders a single leaf's content, sized exactly to its resolved rect.
+func panel(r layout.Rect, style lipgloss.Style, content string) string {
+	return style.Width(r.W).Height(r.H).Render(content)
 }
 
 func initialModel() model {
@@ -508,6 +528,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
+		m.rects = layout.Resolve(tree(), m.width, m.height)
+
 		var leftWidth int
 		var rightWidth int
 		var contentHeight int
@@ -636,7 +658,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if !m.ready {
+	if !m.ready || m.rects == nil {
 		return "Initializing UI..."
 	}
 
@@ -684,7 +706,25 @@ func (m model) View() string {
 		"Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",
 	)
 
-	return body + "\n" + searchLabel + "\n" + help + "\n"
+	//DEBUG: Disable normal return statement
+	if body == "123456" {
+		return body + "\n" + searchLabel + "\n" + help + "\n"
+	}
+
+	// Panels
+	base := lipgloss.NewStyle().Border(lipgloss.NormalBorder())
+	top := panel(m.rects["top"], base, "top\nfixed 30x3")
+	bottom := panel(m.rects["bottom"], base, "bottom\ngrows to fill column height")
+	right := panel(m.rects["right"], base, "right\ngrows to fill remaining width & height")
+
+	// The tree structure tells you how to rejoin the rendered leaves:
+	// top+bottom stack vertically (they're in a Col), then that column
+	// sits beside "right" (they're in the root Row).
+	col1 := lipgloss.JoinVertical(lipgloss.Left, top, bottom)
+	body = lipgloss.JoinHorizontal(lipgloss.Top, col1, right)
+	dumpToFile("debug/col1.txt", col1)
+	dumpToFile("debug/body.txt", body)
+	return body
 }
 
 func main() {
