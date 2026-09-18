@@ -1,29 +1,28 @@
 package layout
 
-// Direction is the axis along which a container node arranges its children.
-type Direction int
+// NodeType defines how a node's children are splitted: vertically or horizontally.
+type NodeType int
 
 const (
-	// RowDir arranges children left-to-right, splitting available width.
-	RowDir Direction = iota
-	// ColDir arranges children top-to-bottom, splitting available height.
-	ColDir
+	RowNode    NodeType = iota // RowNode    arranges children left-to-right, splitting available width.
+	ColumnNode                 // ColumnNode arranges children top-to-bottom, splitting available height.
 )
 
-// SizeSpec controls how a node's size is computed along its parent's split axis.
-// Leave everything to zerores for "just grow evenly with weight 1".
+// SizeSpec defines a node's requirements.
+// It controls how a node's size is computed along its parent's split axis.
+// Leave everything to default value to "just grow evenly with an equal weight".
 type SizeSpec struct {
-	Fixed int // exact size on the split axis; 0 = not fixed, use Grow instead
-	Min   int // clamp: minimum size on the split axis; 0 = no minimum
-	Max   int // clamp: maximum size on the split axis; 0 = no maximum
-	Grow  int // weight for sharing leftover space with sibling growers. 0 defaults to 1
+	Fixed int // exact size on the split axis. A value of 0 means unspecified.
+	Min   int // clamp: minimum size on the split axis. A value of 0 means no minimum.
+	Max   int // clamp: maximum size on the split axis. A value of 0 means no maximum.
+	Grow  int // weight for sharing leftover space with sibling growers. A value of 0 means unspecified.
 }
 
-// Node is one element of the layout tree: either a leaf (a panel designed to render into) or a parent/container (Row/Col) with children.
+// Node is one element of the layout tree: either a leaf (a panel designed to render into) or a parent/container (rows/columns) with children.
 type Node struct {
 	Name     string   // required on leaves you want to look up after Resolve
 	Size     SizeSpec // sizing on the parent's split axis; ignored on the root
-	Dir      Direction
+	NodeType NodeType
 	Children []*Node
 }
 
@@ -32,27 +31,48 @@ type Rect struct {
 	X, Y, W, H int
 }
 
+// Shrink reduce the size of a Rect on all sides at once.
+// With one argument, the reduction is applied to all sides.
+// With two arguments, the reduction is applied to the vertical and horizontal sides, in that order.
+// With three arguments, the reduction is applied to the top side, the horizontal sides, and the bottom side, in that order.
+// With four arguments, the reduction is applied clockwise starting from the top side, followed by the right side, then the bottom, and finally the left.
+// With more than four arguments no reduction is applied.
+func (r Rect) Shrink(n ...int) Rect {
+	switch len(n) {
+	case 1:
+		return ShrinkRect(r, n[0])
+	case 2:
+		return ShrinkRect(r, n[0], n[1])
+	case 3:
+		return ShrinkRect(r, n[0], n[1], n[2])
+	case 4:
+		return ShrinkRect(r, n[0], n[1], n[2], n[3])
+	default:
+		return r
+	}
+}
+
 // Row creates a container whose children are arranged side-by-side, splitting the width.
 // size controls how wide this node is relative to its own siblings (ignored if this is the tree root).
 func Row(size SizeSpec, children ...*Node) *Node {
-	return &Node{Size: size, Dir: RowDir, Children: children}
+	return &Node{Size: size, NodeType: RowNode, Children: children}
 }
 
 // Col creates a container whose children are stacked top-to-bottom, splitting the height.
 // size controls how tall this node is relative to its own siblings (ignored if this is the tree root).
 func Col(size SizeSpec, children ...*Node) *Node {
-	return &Node{Size: size, Dir: ColDir, Children: children}
+	return &Node{Size: size, NodeType: ColumnNode, Children: children}
 }
 
 // Leaf creates a panel.
-// name must be unique across the tree if you intend to use this name for look ups in the final layout.Rect map.
+// name must be unique across the tree if you intend to use this name for look ups in the final Rect map.
 func Leaf(name string, size SizeSpec) *Node {
 	return &Node{Name: name, Size: size}
 }
 
 // Resolve walks the tree and computes the Rect of every named node for the given terminal width/height.
 // Call this once per tea.WindowSizeMsg.
-func Resolve(root *Node, width, height int) map[string]Rect {
+func Resolve(root *Node, width int, height int) map[string]Rect {
 	out := make(map[string]Rect)
 	resolve(root, 0, 0, width, height, out)
 	return out
@@ -65,15 +85,15 @@ func resolve(n *Node, x, y, w, h int, out map[string]Rect) {
 	if len(n.Children) == 0 {
 		return
 	}
-	switch n.Dir {
-	case RowDir:
+	switch n.NodeType {
+	case RowNode:
 		widths := distribute(n.Children, w)
 		cx := x
 		for i, c := range n.Children {
 			resolve(c, cx, y, widths[i], h, out)
 			cx += widths[i]
 		}
-	case ColDir:
+	case ColumnNode:
 		heights := distribute(n.Children, h)
 		cy := y
 		for i, c := range n.Children {
@@ -83,10 +103,11 @@ func resolve(n *Node, x, y, w, h int, out map[string]Rect) {
 	}
 }
 
-// distribute splits total dimension among children's.
-// It processes SizeSpecs fixed sizes first (clamped).
-// Then the remaining space by Grow weight (also clamped).
-// Finally, the last growing sibling absorbing any rounding remainder.
+// distribute splits a parent node total dimension among its given children's according to each children's SizeSpecs.
+// It distribute the total dimension in the following order:
+// 1. Fixed values for width/height
+// 2. Remaining space by Grow weight.
+// 3. The last growing sibling absorbing any rounding remainder (to use up all space).
 func distribute(children []*Node, total int) []int {
 	sizes := make([]int, len(children))
 	remaining := total

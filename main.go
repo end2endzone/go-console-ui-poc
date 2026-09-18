@@ -53,6 +53,7 @@ type model struct {
 	viewportFocused bool
 	searchText      textinput.Model
 	ready           bool
+	layoutTree      *layout.Node
 	rects           map[string]layout.Rect
 	width           int
 	height          int
@@ -215,13 +216,12 @@ func hasBookChanged(before *Book, after *Book) bool {
 	return true
 }
 
-// tree describes the layout once. It never changes at runtime — only the
-// width/height passed to layout.Resolve changes, on every WindowSizeMsg.
+// tree describes the layout of the panels.
 func tree() *layout.Node {
 	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
 		layout.Col(layout.SizeSpec{Fixed: 30}, // column 1: fixed 30 cols wide
-			layout.Leaf("top", layout.SizeSpec{Fixed: 3}),   // fixed height
-			layout.Leaf("bottom", layout.SizeSpec{Grow: 1}), // fills remaining height
+			layout.Leaf("top-left", layout.SizeSpec{Fixed: 3}),   // fixed height
+			layout.Leaf("bottom-left", layout.SizeSpec{Grow: 1}), // fills remaining height
 		),
 		layout.Leaf("right", layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
 	)
@@ -230,7 +230,7 @@ func tree() *layout.Node {
 // panel renders the given content inside the given Rect so that the border itself matches exactly on the rect.
 func panel(r layout.Rect, style lipgloss.Style, content string) string {
 	c := layout.ShrinkRect(r, 1) // 1 = border thickness
-	return style.Width(c.W).Height(c.H).Render(content)
+	return style.Width(c.W).Height(c.H).Border(lipgloss.RoundedBorder()).Render(content)
 }
 
 func initialModel() model {
@@ -272,6 +272,7 @@ func initialModel() model {
 		books:      books,
 		table:      t,
 		searchText: searchText,
+		layoutTree: tree(),
 	}
 
 	m.FocusComponent(LeftTable)
@@ -529,7 +530,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		m.rects = layout.Resolve(tree(), m.width, m.height)
+		m.rects = layout.Resolve(m.layoutTree, m.width, m.height)
 
 		var leftWidth int
 		var rightWidth int
@@ -714,8 +715,8 @@ func (m model) View() string {
 
 	// Panels
 	base := lipgloss.NewStyle().Border(lipgloss.NormalBorder())
-	top := panel(m.rects["top"], base, "top:fixed 30x3")
-	bottom := panel(m.rects["bottom"], base, "bottom\ngrows to fill column height")
+	top := panel(m.rects["top-left"], base, "top:fixed 30x3")
+	bottom := panel(m.rects["bottom-left"], base, "bottom\ngrows to fill column height")
 	right := panel(m.rects["right"], base, "right\ngrows to fill remaining width & height")
 
 	// The tree structure tells you how to rejoin the rendered leaves:
