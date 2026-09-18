@@ -1,5 +1,9 @@
 package layout
 
+import (
+	"github.com/charmbracelet/lipgloss"
+)
+
 // NodeType defines how a node's children are splitted: vertically or horizontally.
 type NodeType int
 
@@ -50,6 +54,12 @@ func (r Rect) Shrink(n ...int) Rect {
 	default:
 		return r
 	}
+}
+
+// View renders the given content inside the given Rect so that the border itself matches exactly on the rect.
+func (r Rect) View(style lipgloss.Style, content string) string {
+	inner := ShrinkRect(r, 1) // 1 = border thickness
+	return style.Width(inner.W).Height(inner.H).Render(content)
 }
 
 // Row creates a container whose children are arranged side-by-side, splitting the width.

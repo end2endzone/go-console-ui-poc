@@ -37,6 +37,13 @@ const (
 	SearchText                           // 3
 )
 
+// Declare all panel names as constants
+const (
+	SearchPanel  string = "SearchPanel"
+	BooksPanel   string = "BooksPanel"
+	SummaryPanel string = "SummaryPanel"
+)
+
 type theme struct {
 	focusedBorderColor   lipgloss.Color
 	unfocusedBorderColor lipgloss.Color
@@ -220,17 +227,11 @@ func hasBookChanged(before *Book, after *Book) bool {
 func tree() *layout.Node {
 	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
 		layout.Col(layout.SizeSpec{Fixed: 30}, // column 1: fixed 30 cols wide
-			layout.Leaf("top-left", layout.SizeSpec{Fixed: 3}),   // fixed height
-			layout.Leaf("bottom-left", layout.SizeSpec{Grow: 1}), // fills remaining height
+			layout.Leaf(SearchPanel, layout.SizeSpec{Fixed: 3}), // fixed height
+			layout.Leaf(BooksPanel, layout.SizeSpec{Grow: 1}),   // fills remaining height
 		),
-		layout.Leaf("right", layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
+		layout.Leaf(SummaryPanel, layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
 	)
-}
-
-// panel renders the given content inside the given Rect so that the border itself matches exactly on the rect.
-func panel(r layout.Rect, style lipgloss.Style, content string) string {
-	c := layout.ShrinkRect(r, 1) // 1 = border thickness
-	return style.Width(c.W).Height(c.H).Border(lipgloss.RoundedBorder()).Render(content)
 }
 
 func initialModel() model {
@@ -714,16 +715,15 @@ func (m model) View() string {
 	}
 
 	// Panels
-	base := lipgloss.NewStyle().Border(lipgloss.NormalBorder())
-	top := panel(m.rects["top-left"], base, "top:fixed 30x3")
-	bottom := panel(m.rects["bottom-left"], base, "bottom\ngrows to fill column height")
-	right := panel(m.rects["right"], base, "right\ngrows to fill remaining width & height")
+	base := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
+	searchPanelContent := m.rects[SearchPanel].View(base, "top:fixed 30x3")
+	booksPanelContent := m.rects[BooksPanel].View(base, "bottom\ngrows to fill column height")
+	summaryPanelContent := m.rects[SummaryPanel].View(base, "right\ngrows to fill remaining width & height")
 
-	// The tree structure tells you how to rejoin the rendered leaves:
-	// top+bottom stack vertically (they're in a Col), then that column
-	// sits beside "right" (they're in the root Row).
-	col1 := lipgloss.JoinVertical(lipgloss.Left, top, bottom)
-	body = lipgloss.JoinHorizontal(lipgloss.Top, col1, right)
+	// Join all panels
+	leftColumn := lipgloss.JoinVertical(lipgloss.Left, searchPanelContent, booksPanelContent)
+	body = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, summaryPanelContent)
+
 	return body
 }
 
