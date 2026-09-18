@@ -227,9 +227,10 @@ func tree() *layout.Node {
 	)
 }
 
-// panel renders a single leaf's content, sized exactly to its resolved rect.
+// panel renders the given content inside the given Rect so that the border itself matches exactly on the rect.
 func panel(r layout.Rect, style lipgloss.Style, content string) string {
-	return style.Width(r.W).Height(r.H).Render(content)
+	c := layout.ShrinkRect(r, 1) // 1 = border thickness
+	return style.Width(c.W).Height(c.H).Render(content)
 }
 
 func initialModel() model {
@@ -713,7 +714,7 @@ func (m model) View() string {
 
 	// Panels
 	base := lipgloss.NewStyle().Border(lipgloss.NormalBorder())
-	top := panel(m.rects["top"], base, "top\nfixed 30x3")
+	top := panel(m.rects["top"], base, "top:fixed 30x3")
 	bottom := panel(m.rects["bottom"], base, "bottom\ngrows to fill column height")
 	right := panel(m.rects["right"], base, "right\ngrows to fill remaining width & height")
 
@@ -722,8 +723,6 @@ func (m model) View() string {
 	// sits beside "right" (they're in the root Row).
 	col1 := lipgloss.JoinVertical(lipgloss.Left, top, bottom)
 	body = lipgloss.JoinHorizontal(lipgloss.Top, col1, right)
-	dumpToFile("debug/col1.txt", col1)
-	dumpToFile("debug/body.txt", body)
 	return body
 }
 
