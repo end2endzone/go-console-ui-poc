@@ -45,36 +45,61 @@ func (p *Panel) SetBorderStyle(style lipgloss.Style) {
 	p.borderStyle = style
 }
 
-// Shrink reduce the size of a Rect on all sides at once.
+// Shrink reduce the size of a Panel on all sides at once.
 // With one argument, the reduction is applied to all sides.
 // With two arguments, the reduction is applied to the vertical and horizontal sides, in that order.
 // With three arguments, the reduction is applied to the top side, the horizontal sides, and the bottom side, in that order.
 // With four arguments, the reduction is applied clockwise starting from the top side, followed by the right side, then the bottom, and finally the left.
 // With more than four arguments no reduction is applied.
 func (p *Panel) Shrink(n ...int) {
-	var tmp Panel
+	top := 0
+	right := 0
+	bottom := 0
+	left := 0
+
 	switch len(n) {
 	case 1:
-		tmp = ShrinkRect(*p, n[0])
+		top = n[0]
+		bottom = n[0]
+		left = n[0]
+		right = n[0]
 	case 2:
-		tmp = ShrinkRect(*p, n[0], n[1])
+		top = n[0]
+		right = n[1]
+		bottom = n[0]
+		left = n[1]
 	case 3:
-		tmp = ShrinkRect(*p, n[0], n[1], n[2])
+		top = n[0]
+		left = n[1]
+		right = n[1]
+		bottom = n[2]
 	case 4:
-		tmp = ShrinkRect(*p, n[0], n[1], n[2], n[3])
-	default:
+		top = n[0]
+		right = n[1]
+		bottom = n[2]
+		left = n[3]
 	}
 
-	// Copy size from tmp panel to actual panel
-	p.X = tmp.X
-	p.Y = tmp.Y
-	p.W = tmp.W
-	p.H = tmp.H
+	x := p.X + left
+	y := p.Y + top
+	w := p.W - left - right
+	h := p.H - top - bottom
+
+	if w < 0 {
+		w = 0
+	}
+	if h < 0 {
+		h = 0
+	}
+
+	p.X = x
+	p.Y = y
+	p.W = w
+	p.H = h
 }
 
 func (p Panel) View() string {
-	inner := ShrinkRect(p, 1) // 1 = border thickness
-	return p.borderStyle.Width(inner.W).Height(inner.H).Render(p.content)
+	return p.borderStyle.Width(p.W).Height(p.H).Render(p.content)
 }
 
 // Row creates a container whose children are arranged side-by-side, splitting the width.
@@ -105,7 +130,9 @@ func Resolve(root *Node, width int, height int) map[string]Panel {
 
 func resolve(n *Node, x, y, w, h int, out map[string]Panel) {
 	if n.Name != "" {
-		out[n.Name] = Panel{X: x, Y: y, W: w, H: h}
+		p := Panel{X: x, Y: y, W: w, H: h}
+		p.Shrink(1) // 1 = border thickness
+		out[n.Name] = p
 	}
 	if len(n.Children) == 0 {
 		return
@@ -175,61 +202,6 @@ func distribute(children []*Node, total int) []int {
 		distributed += sz
 	}
 	return sizes
-}
-
-// Shrink reduce the size of a Rect on all sides at once.
-// With one argument, the reduction is applied to all sides.
-// With two arguments, the reduction is applied to the vertical and horizontal sides, in that order.
-// With three arguments, the reduction is applied to the top side, the horizontal sides, and the bottom side, in that order.
-// With four arguments, the reduction is applied clockwise starting from the top side, followed by the right side, then the bottom, and finally the left.
-// With more than four arguments no reduction is applied.
-func ShrinkRect(r Panel, n ...int) Panel {
-	top := 0
-	right := 0
-	bottom := 0
-	left := 0
-
-	switch len(n) {
-	case 1:
-		top = n[0]
-		bottom = n[0]
-		left = n[0]
-		right = n[0]
-	case 2:
-		top = n[0]
-		right = n[1]
-		bottom = n[0]
-		left = n[1]
-	case 3:
-		top = n[0]
-		left = n[1]
-		right = n[1]
-		bottom = n[2]
-	case 4:
-		top = n[0]
-		right = n[1]
-		bottom = n[2]
-		left = n[3]
-	}
-
-	x := r.X + left
-	y := r.Y + top
-	w := r.W - left - right
-	h := r.H - top - bottom
-
-	if w < 0 {
-		w = 0
-	}
-	if h < 0 {
-		h = 0
-	}
-
-	return Panel{
-		X: x,
-		Y: y,
-		W: w,
-		H: h,
-	}
 }
 
 func clamp(v, min, max int) int {
