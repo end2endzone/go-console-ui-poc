@@ -12,7 +12,7 @@ const (
 	ColumnNode                 // ColumnNode arranges children top-to-bottom, splitting available height.
 )
 
-// SizeSpec defines a node's requirements.
+// SizeSpec defines a node's requirement specifications.
 // It controls how a node's size is computed along its parent's split axis.
 // Leave everything to default value to "just grow evenly with an equal weight".
 type SizeSpec struct {
