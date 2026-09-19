@@ -61,7 +61,7 @@ type model struct {
 	searchText      textinput.Model
 	ready           bool
 	layoutTree      *layout.Node
-	rects           map[string]layout.Rect
+	panels          map[string]layout.Panel
 	width           int
 	height          int
 }
@@ -531,7 +531,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		m.rects = layout.Resolve(m.layoutTree, m.width, m.height)
+		m.panels = layout.Resolve(m.layoutTree, m.width, m.height)
 
 		var leftWidth int
 		var rightWidth int
@@ -661,7 +661,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if !m.ready || m.rects == nil {
+	if !m.ready || m.panels == nil {
 		return "Initializing UI..."
 	}
 
@@ -716,13 +716,21 @@ func (m model) View() string {
 
 	// Panels
 	base := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
-	searchPanelContent := m.rects[SearchPanel].View(base, "top:fixed 30x3")
-	booksPanelContent := m.rects[BooksPanel].View(base, "bottom\ngrows to fill column height")
-	summaryPanelContent := m.rects[SummaryPanel].View(base, "right\ngrows to fill remaining width & height")
+	searchPanel := m.panels[SearchPanel]
+	booksPanel := m.panels[BooksPanel]
+	summaryPanel := m.panels[SummaryPanel]
+
+	searchPanel.SetBorderStyle(base)
+	booksPanel.SetBorderStyle(base)
+	summaryPanel.SetBorderStyle(base)
+
+	searchPanel.SetContent("top:fixed 30x3")
+	booksPanel.SetContent("bottom\ngrows to fill column height")
+	summaryPanel.SetContent("right\ngrows to fill remaining width & height")
 
 	// Join all panels
-	leftColumn := lipgloss.JoinVertical(lipgloss.Left, searchPanelContent, booksPanelContent)
-	body = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, summaryPanelContent)
+	leftColumn := lipgloss.JoinVertical(lipgloss.Left, searchPanel.View(), booksPanel.View())
+	body = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, summaryPanel.View())
 
 	return body
 }

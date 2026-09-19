@@ -30,9 +30,19 @@ type Node struct {
 	Children []*Node
 }
 
-// Rect is a resolved leaf's position and size in terminal cells.
-type Rect struct {
-	X, Y, W, H int
+// Panel is a resolved leaf's position and size in terminal cells.
+type Panel struct {
+	X, Y, W, H  int
+	borderStyle lipgloss.Style
+	content     string
+}
+
+func (p *Panel) SetContent(content string) {
+	p.content = content
+}
+
+func (p *Panel) SetBorderStyle(style lipgloss.Style) {
+	p.borderStyle = style
 }
 
 // Shrink reduce the size of a Rect on all sides at once.
@@ -41,25 +51,30 @@ type Rect struct {
 // With three arguments, the reduction is applied to the top side, the horizontal sides, and the bottom side, in that order.
 // With four arguments, the reduction is applied clockwise starting from the top side, followed by the right side, then the bottom, and finally the left.
 // With more than four arguments no reduction is applied.
-func (r Rect) Shrink(n ...int) Rect {
+func (p *Panel) Shrink(n ...int) {
+	var tmp Panel
 	switch len(n) {
 	case 1:
-		return ShrinkRect(r, n[0])
+		tmp = ShrinkRect(*p, n[0])
 	case 2:
-		return ShrinkRect(r, n[0], n[1])
+		tmp = ShrinkRect(*p, n[0], n[1])
 	case 3:
-		return ShrinkRect(r, n[0], n[1], n[2])
+		tmp = ShrinkRect(*p, n[0], n[1], n[2])
 	case 4:
-		return ShrinkRect(r, n[0], n[1], n[2], n[3])
+		tmp = ShrinkRect(*p, n[0], n[1], n[2], n[3])
 	default:
-		return r
 	}
+
+	// Copy size from tmp panel to actual panel
+	p.X = tmp.X
+	p.Y = tmp.Y
+	p.W = tmp.W
+	p.H = tmp.H
 }
 
-// View renders the given content inside the given Rect so that the border itself matches exactly on the rect.
-func (r Rect) View(style lipgloss.Style, content string) string {
-	inner := ShrinkRect(r, 1) // 1 = border thickness
-	return style.Width(inner.W).Height(inner.H).Render(content)
+func (p Panel) View() string {
+	inner := ShrinkRect(p, 1) // 1 = border thickness
+	return p.borderStyle.Width(inner.W).Height(inner.H).Render(p.content)
 }
 
 // Row creates a container whose children are arranged side-by-side, splitting the width.
@@ -82,15 +97,15 @@ func Leaf(name string, size SizeSpec) *Node {
 
 // Resolve walks the tree and computes the Rect of every named node for the given terminal width/height.
 // Call this once per tea.WindowSizeMsg.
-func Resolve(root *Node, width int, height int) map[string]Rect {
-	out := make(map[string]Rect)
+func Resolve(root *Node, width int, height int) map[string]Panel {
+	out := make(map[string]Panel)
 	resolve(root, 0, 0, width, height, out)
 	return out
 }
 
-func resolve(n *Node, x, y, w, h int, out map[string]Rect) {
+func resolve(n *Node, x, y, w, h int, out map[string]Panel) {
 	if n.Name != "" {
-		out[n.Name] = Rect{X: x, Y: y, W: w, H: h}
+		out[n.Name] = Panel{X: x, Y: y, W: w, H: h}
 	}
 	if len(n.Children) == 0 {
 		return
@@ -168,7 +183,7 @@ func distribute(children []*Node, total int) []int {
 // With three arguments, the reduction is applied to the top side, the horizontal sides, and the bottom side, in that order.
 // With four arguments, the reduction is applied clockwise starting from the top side, followed by the right side, then the bottom, and finally the left.
 // With more than four arguments no reduction is applied.
-func ShrinkRect(r Rect, n ...int) Rect {
+func ShrinkRect(r Panel, n ...int) Panel {
 	top := 0
 	right := 0
 	bottom := 0
@@ -209,7 +224,7 @@ func ShrinkRect(r Rect, n ...int) Rect {
 		h = 0
 	}
 
-	return Rect{
+	return Panel{
 		X: x,
 		Y: y,
 		W: w,
