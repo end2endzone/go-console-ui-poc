@@ -30,7 +30,7 @@ type Node struct {
 	Children []*Node
 
 	// Render properties
-	Rect    Rect // dimensions of the panel's borders
+	Borders Rect // dimensions of the panel's borders
 	Style   lipgloss.Style
 	Content string
 }
@@ -43,11 +43,11 @@ func (n *Node) IsLeaf() bool {
 }
 
 func (n *Node) GetBorderRect() Rect {
-	return n.Rect
+	return n.Borders
 }
 
 func (n *Node) GetInnerRect() Rect {
-	tmp := n.Rect
+	tmp := n.Borders
 	tmp.Shrink(1) // 1 = border thickness
 	return tmp
 }
@@ -192,11 +192,11 @@ func Resolve(root *Node, width int, height int) {
 }
 
 func resolve(n *Node, x, y, w, h int) {
-	n.Rect.Reset()
+	n.Borders.Reset()
 
 	if n.IsLeaf() {
 		// Node is a leaf, assign the full remaining size to this node
-		n.Rect = Rect{X: x, Y: y, W: w, H: h}
+		n.Borders = Rect{X: x, Y: y, W: w, H: h}
 	}
 
 	switch n.NodeType {

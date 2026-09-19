@@ -551,7 +551,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Resolve panels size based on available space
 		layout.Resolve(m.layoutTree, m.width, m.height-2) // 2 lines for the help string (the help string itself and a final \n)
 
-		tableHeight := m.panels.booksPanel.Rect.H - 2*borderWidth - 4 // 2 lines for "Books" header + 2 lines cursor indicator footer
+		tableHeight := m.panels.booksPanel.Borders.H - 2*borderWidth - 4 // 2 lines for "Books" header + 2 lines cursor indicator footer
 		m.table.SetHeight(tableHeight)
 
 		summaryContentRect := m.panels.summaryPanel.GetInnerRect()
