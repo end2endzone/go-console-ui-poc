@@ -31,16 +31,23 @@ type Node struct {
 
 	// Render properties
 	Rect    Rect
-	style   lipgloss.Style
-	content string
+	Style   lipgloss.Style
+	Content string
+}
+
+func (n *Node) IsLeaf() bool {
+	if len(n.Children) == 0 {
+		return true
+	}
+	return false
 }
 
 func (n *Node) SetContent(content string) {
-	n.content = content
+	n.Content = content
 }
 
 func (n *Node) SetStyle(style lipgloss.Style) {
-	n.style = style
+	n.Style = style
 }
 
 // Find looks up a Node by its name iteratively. The function is non-recusrive.
@@ -73,7 +80,7 @@ func (root *Node) Find(name string) *Node {
 }
 
 func (n *Node) View() string {
-	return n.style.Width(n.Rect.W).Height(n.Rect.H).Render(n.content)
+	return n.Style.Width(n.Rect.W).Height(n.Rect.H).Render(n.Content)
 }
 
 // Rect is a resolved leaf's position and size in terminal cells.
@@ -153,6 +160,14 @@ func Col(size SizeSpec, children ...*Node) *Node {
 	return &Node{Size: size, NodeType: ColumnNode, Children: children}
 }
 
+func RowWithName(name string, size SizeSpec, children ...*Node) *Node {
+	return &Node{Name: name, Size: size, NodeType: RowNode, Children: children}
+}
+
+func ColWithName(name string, size SizeSpec, children ...*Node) *Node {
+	return &Node{Name: name, Size: size, NodeType: ColumnNode, Children: children}
+}
+
 // Leaf creates a panel.
 // name must be unique across the tree if you intend to use this name for look ups in the final Rect map.
 func Leaf(name string, size SizeSpec) *Node {
@@ -168,13 +183,11 @@ func Resolve(root *Node, width int, height int) {
 func resolve(n *Node, x, y, w, h int) {
 	n.Rect.Reset()
 
-	if n.Name != "" {
+	if n.IsLeaf() {
 		n.Rect = Rect{X: x, Y: y, W: w, H: h}
 		n.Rect.Shrink(1) // 1 = border thickness
 	}
-	if len(n.Children) == 0 {
-		return
-	}
+
 	switch n.NodeType {
 	case RowNode:
 		widths := distribute(n.Children, w)

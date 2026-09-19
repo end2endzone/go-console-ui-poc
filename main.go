@@ -39,6 +39,8 @@ const (
 
 // Declare all panel names as constants
 const (
+	RootTree     string = "RootTree"
+	LeftColumn   string = "LeftColumn"
 	SearchPanel  string = "SearchPanel"
 	BooksPanel   string = "BooksPanel"
 	SummaryPanel string = "SummaryPanel"
@@ -229,8 +231,8 @@ func hasBookChanged(before *Book, after *Book) bool {
 
 // tree describes the layout of the panels.
 func tree() *layout.Node {
-	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
-		layout.Col(layout.SizeSpec{Fixed: 30}, // column 1: fixed 30 cols wide
+	return layout.RowWithName(RootTree, layout.SizeSpec{}, // root's own Size is ignored
+		layout.ColWithName(LeftColumn, layout.SizeSpec{Fixed: 40}, // column 1: fixed 40 cols wide
 			layout.Leaf(SearchPanel, layout.SizeSpec{Fixed: 3}), // fixed height
 			layout.Leaf(BooksPanel, layout.SizeSpec{Grow: 1}),   // fills remaining height
 		),
@@ -284,6 +286,12 @@ func initialModel() model {
 
 	// Fill Table
 	m.FillBooksTable("")
+
+	// Now that Books table is filled, we know how wide it is.
+	// Set left panels width based on this.
+	tableWidth := getTableColumnsWidth(&m.table)
+	tableWidth += 4 // +2 for padding (1 on each side), +2 borders
+	m.layoutTree.Find(LeftColumn).Size.Fixed = tableWidth
 
 	// Pre-find the leaf panels
 	m.panels.searchPanel = m.layoutTree.Find(SearchPanel)
@@ -711,31 +719,18 @@ func (m model) View() string {
 
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
 
-	leftPanel := leftStyle.Render(leftTitle + "\n\n" + m.table.View() + "\n\n" + positionIndicatorText)
-	rightPanel := rightStyle.Render(rightTitle + "\n\n" + m.renderViewportWithScrollbar())
+	// Panel's content
+	m.panels.searchPanel.SetContent(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ") + " " + m.searchText.View())
+	m.panels.booksPanel.SetContent(leftTitle + "\n\n" + m.table.View() + "\n\n" + positionIndicatorText)
+	m.panels.summaryPanel.SetContent(rightTitle + "\n\n" + m.renderViewportWithScrollbar())
 
-	body := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
-
-	searchLabel := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ")
-	searchLabel += " " + m.searchText.View()
-
-	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
+	/*help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
 		"Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",
-	)
-
-	//DEBUG: Disable normal return statement
-	if body == "123456" {
-		return body + "\n" + searchLabel + "\n" + help + "\n"
-	}
-
-	// Panels
-	m.panels.searchPanel.SetContent("top:fixed 30x3")
-	m.panels.booksPanel.SetContent("bottom\ngrows to fill column height")
-	m.panels.summaryPanel.SetContent("right\ngrows to fill remaining width & height")
+	)*/
 
 	// Join all panels
 	leftColumn := lipgloss.JoinVertical(lipgloss.Left, m.panels.searchPanel.View(), m.panels.booksPanel.View())
-	body = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summaryPanel.View())
+	body := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summaryPanel.View())
 
 	return body
 }
