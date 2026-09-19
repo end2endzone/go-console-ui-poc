@@ -61,9 +61,13 @@ type model struct {
 	searchText      textinput.Model
 	ready           bool
 	layoutTree      *layout.Node
-	panels          map[string]layout.Panel
-	width           int
-	height          int
+	panels          struct {
+		searchPanel  *layout.Node
+		booksPanel   *layout.Node
+		summaryPanel *layout.Node
+	}
+	width  int
+	height int
 }
 
 // Theme display constants
@@ -280,6 +284,11 @@ func initialModel() model {
 
 	// Fill Table
 	m.FillBooksTable("")
+
+	// Pre-find the leaf panels
+	m.panels.searchPanel = m.layoutTree.Find(SearchPanel)
+	m.panels.booksPanel = m.layoutTree.Find(BooksPanel)
+	m.panels.summaryPanel = m.layoutTree.Find(SummaryPanel)
 
 	return m
 }
@@ -531,7 +540,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		m.panels = layout.Resolve(m.layoutTree, m.width, m.height)
+		layout.Resolve(m.layoutTree, m.width, m.height)
 
 		var leftWidth int
 		var rightWidth int
@@ -661,7 +670,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if !m.ready || m.panels == nil {
+	if !m.ready {
 		return "Initializing UI..."
 	}
 
@@ -692,6 +701,11 @@ func (m model) View() string {
 		BorderForeground(rightBorderColor).
 		Padding(m.theme.panelsPadding...)
 
+	// Panels
+	m.panels.searchPanel.SetStyle(leftStyle)
+	m.panels.booksPanel.SetStyle(leftStyle)
+	m.panels.summaryPanel.SetStyle(rightStyle)
+
 	leftTitle := m.theme.headerTextStyle.Render("Books")
 	rightTitle := m.theme.headerTextStyle.Render("Summary")
 
@@ -715,22 +729,13 @@ func (m model) View() string {
 	}
 
 	// Panels
-	base := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
-	searchPanel := m.panels[SearchPanel]
-	booksPanel := m.panels[BooksPanel]
-	summaryPanel := m.panels[SummaryPanel]
-
-	searchPanel.SetBorderStyle(base)
-	booksPanel.SetBorderStyle(base)
-	summaryPanel.SetBorderStyle(base)
-
-	searchPanel.SetContent("top:fixed 30x3")
-	booksPanel.SetContent("bottom\ngrows to fill column height")
-	summaryPanel.SetContent("right\ngrows to fill remaining width & height")
+	m.panels.searchPanel.SetContent("top:fixed 30x3")
+	m.panels.booksPanel.SetContent("bottom\ngrows to fill column height")
+	m.panels.summaryPanel.SetContent("right\ngrows to fill remaining width & height")
 
 	// Join all panels
-	leftColumn := lipgloss.JoinVertical(lipgloss.Left, searchPanel.View(), booksPanel.View())
-	body = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, summaryPanel.View())
+	leftColumn := lipgloss.JoinVertical(lipgloss.Left, m.panels.searchPanel.View(), m.panels.booksPanel.View())
+	body = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summaryPanel.View())
 
 	return body
 }

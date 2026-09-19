@@ -28,21 +28,57 @@ type Node struct {
 	Size     SizeSpec // sizing on the parent's split axis; ignored on the root
 	NodeType NodeType
 	Children []*Node
+
+	// Render properties
+	Rect    Rect
+	style   lipgloss.Style
+	content string
 }
 
-// Panel is a resolved leaf's position and size in terminal cells.
-type Panel struct {
-	X, Y, W, H  int
-	borderStyle lipgloss.Style
-	content     string
+func (n *Node) SetContent(content string) {
+	n.content = content
 }
 
-func (p *Panel) SetContent(content string) {
-	p.content = content
+func (n *Node) SetStyle(style lipgloss.Style) {
+	n.style = style
 }
 
-func (p *Panel) SetBorderStyle(style lipgloss.Style) {
-	p.borderStyle = style
+// Find looks up a Node by its name iteratively. The function is non-recusrive.
+// Returns the first node matching the given name. Returns nil otherwise.
+func (root *Node) Find(name string) *Node {
+	if root == nil {
+		return nil
+	}
+
+	// Initialize a queue for BFS tracking
+	queue := []*Node{root}
+
+	for len(queue) > 0 {
+		// Pop the first element from the queue
+		current := queue[0]
+		queue = queue[1:]
+
+		// Check if this is the node we are looking for
+		if current.Name == name {
+			return current
+		}
+
+		// Add all children to the queue to be processed later
+		if len(current.Children) > 0 {
+			queue = append(queue, current.Children...)
+		}
+	}
+
+	return nil
+}
+
+func (n *Node) View() string {
+	return n.style.Width(n.Rect.W).Height(n.Rect.H).Render(n.content)
+}
+
+// Rect is a resolved leaf's position and size in terminal cells.
+type Rect struct {
+	X, Y, W, H int
 }
 
 // Shrink reduce the size of a Panel on all sides at once.
@@ -51,7 +87,7 @@ func (p *Panel) SetBorderStyle(style lipgloss.Style) {
 // With three arguments, the reduction is applied to the top side, the horizontal sides, and the bottom side, in that order.
 // With four arguments, the reduction is applied clockwise starting from the top side, followed by the right side, then the bottom, and finally the left.
 // With more than four arguments no reduction is applied.
-func (p *Panel) Shrink(n ...int) {
+func (r *Rect) Shrink(n ...int) {
 	top := 0
 	right := 0
 	bottom := 0
@@ -80,10 +116,10 @@ func (p *Panel) Shrink(n ...int) {
 		left = n[3]
 	}
 
-	x := p.X + left
-	y := p.Y + top
-	w := p.W - left - right
-	h := p.H - top - bottom
+	x := r.X + left
+	y := r.Y + top
+	w := r.W - left - right
+	h := r.H - top - bottom
 
 	if w < 0 {
 		w = 0
@@ -92,14 +128,17 @@ func (p *Panel) Shrink(n ...int) {
 		h = 0
 	}
 
-	p.X = x
-	p.Y = y
-	p.W = w
-	p.H = h
+	r.X = x
+	r.Y = y
+	r.W = w
+	r.H = h
 }
 
-func (p Panel) View() string {
-	return p.borderStyle.Width(p.W).Height(p.H).Render(p.content)
+func (r *Rect) Reset() {
+	r.X = 0
+	r.Y = 0
+	r.W = 0
+	r.H = 0
 }
 
 // Row creates a container whose children are arranged side-by-side, splitting the width.
@@ -122,17 +161,16 @@ func Leaf(name string, size SizeSpec) *Node {
 
 // Resolve walks the tree and computes the Rect of every named node for the given terminal width/height.
 // Call this once per tea.WindowSizeMsg.
-func Resolve(root *Node, width int, height int) map[string]Panel {
-	out := make(map[string]Panel)
-	resolve(root, 0, 0, width, height, out)
-	return out
+func Resolve(root *Node, width int, height int) {
+	resolve(root, 0, 0, width, height)
 }
 
-func resolve(n *Node, x, y, w, h int, out map[string]Panel) {
+func resolve(n *Node, x, y, w, h int) {
+	n.Rect.Reset()
+
 	if n.Name != "" {
-		p := Panel{X: x, Y: y, W: w, H: h}
-		p.Shrink(1) // 1 = border thickness
-		out[n.Name] = p
+		n.Rect = Rect{X: x, Y: y, W: w, H: h}
+		n.Rect.Shrink(1) // 1 = border thickness
 	}
 	if len(n.Children) == 0 {
 		return
@@ -142,14 +180,14 @@ func resolve(n *Node, x, y, w, h int, out map[string]Panel) {
 		widths := distribute(n.Children, w)
 		cx := x
 		for i, c := range n.Children {
-			resolve(c, cx, y, widths[i], h, out)
+			resolve(c, cx, y, widths[i], h)
 			cx += widths[i]
 		}
 	case ColumnNode:
 		heights := distribute(n.Children, h)
 		cy := y
 		for i, c := range n.Children {
-			resolve(c, x, cy, w, heights[i], out)
+			resolve(c, x, cy, w, heights[i])
 			cy += heights[i]
 		}
 	}
