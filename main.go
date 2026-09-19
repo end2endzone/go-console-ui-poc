@@ -74,7 +74,7 @@ type model struct {
 
 // Theme display constants
 const (
-	leftRightBorderWidth  = 1
+	borderWidth           = 1
 	leftRightPaddingWidth = 1
 	scrollBarWidth        = 2                                     // For example " █", note the space before the scroll bar cursor
 	minTableItems         = 2                                     // Minimum number of data rows (excluding table's header rows)
@@ -83,7 +83,7 @@ const (
 	minViewportTextWidth  = 1                                     // Minimum width of the text (exclusing the scroll bars characters)
 	minRightViewportWidth = minViewportTextWidth + scrollBarWidth // 1 character wide + scroll bar
 	minRightWidth         = minRightViewportWidth +
-		2*leftRightBorderWidth +
+		2*borderWidth +
 		2*leftRightPaddingWidth // 2 characters for border, 2 characters for padding
 )
 
@@ -548,51 +548,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		/*var leftWidth int
-		var rightWidth int
-		var contentHeight int
-		var rightViewportWidth int
-		{
-			// Width computation of both panels
-			{
-				tableWidth := getTableColumnsWidth(&m.table)
-				leftWidth = tableWidth + 4 // +2 for padding (1 on each side), +2 borders
-				rightWidth = m.width - leftWidth
-
-				if rightWidth < minRightWidth {
-					rightWidth = minRightWidth
-				}
-			}
-
-			// Height computation of both panels
-			{
-				contentHeight = m.height - 5 // 2 lines for the top and bottom borders, 1 search line, 2 lines for the help string (the help string itself and a final \n)
-				if contentHeight < minContentHeight {
-					contentHeight = minContentHeight
-				}
-			}
-
-			// Left panel calculations
-			{
-				tableHeight := contentHeight - 4 // 2 lines for "Books" header + 2 lines cursor indicator footer
-				if tableHeight < minTableHeight {
-					tableHeight = minTableHeight
-				}
-
-				// Leave table's width to default value 0 so that is uses the minimum required width
-				m.table.SetHeight(tableHeight)
-			}
-
-			// Right panel calculations
-			{
-				rightViewportWidth = rightWidth - 2*leftRightBorderWidth - 2*leftRightPaddingWidth
-			}
-		}*/
-
 		// Resolve panels size based on available space
 		layout.Resolve(m.layoutTree, m.width, m.height-2) // 2 lines for the help string (the help string itself and a final \n)
 
-		tableHeight := m.panels.booksPanel.Rect.H - 6 // 2 lines for borders, 2 lines for "Books" header + 2 lines cursor indicator footer
+		tableHeight := m.panels.booksPanel.Rect.H - 2*borderWidth - 4 // 2 lines for "Books" header + 2 lines cursor indicator footer
 		m.table.SetHeight(tableHeight)
 
 		summaryContentRect := m.panels.summaryPanel.GetInnerRect()
