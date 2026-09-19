@@ -234,8 +234,8 @@ func hasBookChanged(before *Book, after *Book) bool {
 func tree() *layout.Node {
 	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
 		layout.ColWithName(LeftColumnName, layout.SizeSpec{Fixed: 40}, // column 1: fixed 40 cols wide
-			layout.Leaf(SearchPanelName, layout.SizeSpec{Fixed: 3}), // fixed height
 			layout.Leaf(BooksPanelName, layout.SizeSpec{Grow: 1}),   // fills remaining height
+			layout.Leaf(SearchPanelName, layout.SizeSpec{Fixed: 3}), // fixed height
 		),
 		layout.Leaf(SummaryPanelName, layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
 	)
@@ -283,6 +283,7 @@ func initialModel() model {
 		layoutTree: tree(),
 	}
 
+	// Focus books by default
 	m.FocusComponent(BooksPanel)
 
 	// Fill Table
@@ -344,11 +345,11 @@ func (m *model) FocusNextComponent() {
 
 	switch activeComponent {
 	case BooksPanel:
-		m.FocusComponent(SummaryPanel)
-	case SummaryPanel:
 		m.FocusComponent(SearchPanel)
-	case SearchPanel:
+	case SummaryPanel:
 		m.FocusComponent(BooksPanel)
+	case SearchPanel:
+		m.FocusComponent(SummaryPanel)
 	default:
 		m.FocusComponent(BooksPanel)
 	}
@@ -710,7 +711,7 @@ func (m model) View() string {
 	)
 
 	// Join all panels
-	leftColumn := lipgloss.JoinVertical(lipgloss.Left, m.panels.searchPanel.View(), m.panels.booksPanel.View())
+	leftColumn := lipgloss.JoinVertical(lipgloss.Left, m.panels.booksPanel.View(), m.panels.searchPanel.View())
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summaryPanel.View())
 	body := panels + "\n" + help
 
