@@ -548,9 +548,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		layout.Resolve(m.layoutTree, m.width, m.height)
-
-		var leftWidth int
+		/*var leftWidth int
 		var rightWidth int
 		var contentHeight int
 		var rightViewportWidth int
@@ -589,14 +587,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			{
 				rightViewportWidth = rightWidth - 2*leftRightBorderWidth - 2*leftRightPaddingWidth
 			}
-		}
+		}*/
+
+		// Resolve panels size based on available space
+		layout.Resolve(m.layoutTree, m.width, m.height-2) // 2 lines for the help string (the help string itself and a final \n)
+
+		tableHeight := m.panels.booksPanel.Rect.H - 6 // 2 lines for borders, 2 lines for "Books" header + 2 lines cursor indicator footer
+		m.table.SetHeight(tableHeight)
+
+		summaryContentRect := m.panels.summaryPanel.GetInnerRect()
+		summaryViewportWidth := summaryContentRect.W - scrollBarWidth
 
 		if !m.ready {
-			m.viewport = viewport.New(rightViewportWidth, contentHeight-2) //right side has a 2 lines non-scrollable header
+			m.viewport = viewport.New(summaryViewportWidth, summaryContentRect.H-2) //right side has a 2 lines non-scrollable header
 			m.ready = true
 		} else {
-			m.viewport.Width = rightViewportWidth
-			m.viewport.Height = contentHeight - 2 //right side has a 2 lines non-scrollable header
+			m.viewport.Width = summaryViewportWidth
+			m.viewport.Height = summaryContentRect.H - 2 //right side has a 2 lines non-scrollable header
 		}
 
 		// The right viewport dimensions have changed.
@@ -724,13 +731,21 @@ func (m model) View() string {
 	m.panels.booksPanel.SetContent(leftTitle + "\n\n" + m.table.View() + "\n\n" + positionIndicatorText)
 	m.panels.summaryPanel.SetContent(rightTitle + "\n\n" + m.renderViewportWithScrollbar())
 
-	/*help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
+	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
 		"Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",
-	)*/
+	)
 
 	// Join all panels
 	leftColumn := lipgloss.JoinVertical(lipgloss.Left, m.panels.searchPanel.View(), m.panels.booksPanel.View())
-	body := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summaryPanel.View())
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summaryPanel.View())
+	body := panels + "\n" + help
+
+	/*debug := true
+	if debug {
+		dumpToFile("debug/leftColumn.txt", leftColumn)
+		dumpToFile("debug/panels.txt", panels)
+		dumpToFile("debug/body.txt", body)
+	}*/
 
 	return body
 }
