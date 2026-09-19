@@ -28,22 +28,23 @@ type Book struct {
 // Force model to always implements interface tea.Model
 var _ tea.Model = (*model)(nil)
 
+// Focusable elements of the UI
 type ActiveComponent int
 
 const (
-	Unknown       ActiveComponent = iota // 0
-	LeftTable                            // 1
-	RightViewport                        // 2
-	SearchText                           // 3
+	Unknown        ActiveComponent = iota // 0
+	BooksPanel                            // 1
+	SummaryPanel                          // 2
+	SearchPanel                           // 3
+	ComponentCount = 3
 )
 
 // Declare all panel names as constants
 const (
-	RootTree     string = "RootTree"
-	LeftColumn   string = "LeftColumn"
-	SearchPanel  string = "SearchPanel"
-	BooksPanel   string = "BooksPanel"
-	SummaryPanel string = "SummaryPanel"
+	LeftColumnName   string = "LeftColumn"
+	SearchPanelName  string = "SearchPanel"
+	BooksPanelName   string = "BooksPanel"
+	SummaryPanelName string = "SummaryPanel"
 )
 
 type theme struct {
@@ -231,12 +232,12 @@ func hasBookChanged(before *Book, after *Book) bool {
 
 // tree describes the layout of the panels.
 func tree() *layout.Node {
-	return layout.RowWithName(RootTree, layout.SizeSpec{}, // root's own Size is ignored
-		layout.ColWithName(LeftColumn, layout.SizeSpec{Fixed: 40}, // column 1: fixed 40 cols wide
-			layout.Leaf(SearchPanel, layout.SizeSpec{Fixed: 3}), // fixed height
-			layout.Leaf(BooksPanel, layout.SizeSpec{Grow: 1}),   // fills remaining height
+	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
+		layout.ColWithName(LeftColumnName, layout.SizeSpec{Fixed: 40}, // column 1: fixed 40 cols wide
+			layout.Leaf(SearchPanelName, layout.SizeSpec{Fixed: 3}), // fixed height
+			layout.Leaf(BooksPanelName, layout.SizeSpec{Grow: 1}),   // fills remaining height
 		),
-		layout.Leaf(SummaryPanel, layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
+		layout.Leaf(SummaryPanelName, layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
 	)
 }
 
@@ -282,7 +283,7 @@ func initialModel() model {
 		layoutTree: tree(),
 	}
 
-	m.FocusComponent(LeftTable)
+	m.FocusComponent(BooksPanel)
 
 	// Fill Table
 	m.FillBooksTable("")
@@ -291,12 +292,12 @@ func initialModel() model {
 	// Set left panels width based on this.
 	tableWidth := getTableColumnsWidth(&m.table)
 	tableWidth += 4 // +2 for padding (1 on each side), +2 borders
-	m.layoutTree.Find(LeftColumn).Size.Fixed = tableWidth
+	m.layoutTree.Find(LeftColumnName).Size.Fixed = tableWidth
 
 	// Pre-find the leaf panels
-	m.panels.searchPanel = m.layoutTree.Find(SearchPanel)
-	m.panels.booksPanel = m.layoutTree.Find(BooksPanel)
-	m.panels.summaryPanel = m.layoutTree.Find(SummaryPanel)
+	m.panels.searchPanel = m.layoutTree.Find(SearchPanelName)
+	m.panels.booksPanel = m.layoutTree.Find(BooksPanelName)
+	m.panels.summaryPanel = m.layoutTree.Find(SummaryPanelName)
 
 	return m
 }
@@ -304,11 +305,11 @@ func initialModel() model {
 // ActiveComponent return the active focused component in the main UI.
 func (m *model) ActiveComponent() ActiveComponent {
 	if m.table.Focused() {
-		return LeftTable
+		return BooksPanel
 	} else if m.viewportFocused {
-		return RightViewport
+		return SummaryPanel
 	} else if m.searchText.Focused() {
-		return SearchText
+		return SearchPanel
 	}
 
 	return Unknown
@@ -317,15 +318,15 @@ func (m *model) ActiveComponent() ActiveComponent {
 // FocusComponent focuses the given component and blur other components.
 func (m *model) FocusComponent(c ActiveComponent) {
 	switch c {
-	case LeftTable:
+	case BooksPanel:
 		m.table.Focus()
 		m.viewportFocused = false
 		m.searchText.Blur()
-	case RightViewport:
+	case SummaryPanel:
 		m.table.Blur()
 		m.viewportFocused = true
 		m.searchText.Blur()
-	case SearchText:
+	case SearchPanel:
 		m.table.Blur()
 		m.viewportFocused = false
 		m.searchText.Focus()
@@ -333,6 +334,32 @@ func (m *model) FocusComponent(c ActiveComponent) {
 		m.table.Blur()
 		m.viewportFocused = false
 		m.searchText.Blur()
+	}
+}
+
+// FocusNextComponent focuses the next component.
+func (m *model) FocusNextComponent() {
+	// Get current component
+	activeComponent := m.ActiveComponent()
+
+	switch activeComponent {
+	case BooksPanel:
+		m.FocusComponent(SummaryPanel)
+	case SummaryPanel:
+		m.FocusComponent(SearchPanel)
+	case SearchPanel:
+		m.FocusComponent(BooksPanel)
+	default:
+		m.FocusComponent(BooksPanel)
+	}
+}
+
+// FocusPreviousComponent focuses the previous component.
+func (m *model) FocusPreviousComponent() {
+
+	// To get a mirrored previous cycle, we move forward n-1 times
+	for i := ComponentCount - 1; i > 0; i-- {
+		m.FocusNextComponent()
 	}
 }
 
@@ -572,32 +599,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q":
-			if activeComponent != SearchText {
+			if activeComponent != SearchPanel {
 				// only allow q to quit when its not the search string that has focus
 				return m, tea.Quit
 			}
 		case "esc", "ctrl+c":
 			return m, tea.Quit
 
+		case "shift+tab":
+			m.FocusPreviousComponent()
 		case "tab":
-			// Focus the next component
-			switch activeComponent {
-			case LeftTable:
-				m.FocusComponent(RightViewport)
-			case RightViewport:
-				m.FocusComponent(SearchText)
-			case SearchText:
-				m.FocusComponent(LeftTable)
-			default:
-				m.FocusComponent(LeftTable)
-			}
+			m.FocusNextComponent()
+
 		case "right", "left":
 			// Quickly change from between left and right panels
 			switch activeComponent {
-			case LeftTable:
-				m.FocusComponent(RightViewport)
-			case RightViewport:
-				m.FocusComponent(LeftTable)
+			case BooksPanel:
+				m.FocusComponent(SummaryPanel)
+			case SummaryPanel:
+				m.FocusComponent(BooksPanel)
 			}
 		}
 	}
@@ -605,7 +625,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// The message was not consumed by previous code.
 	// Delegate the msg to the active panel
 	switch activeComponent {
-	case LeftTable:
+	case BooksPanel:
 		previousBookPtr := m.SelectedBook()
 
 		m.table, cmd = m.table.Update(msg)
@@ -621,10 +641,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// And move the right viewport to the top of the view
 			m.viewport.GotoTop()
 		}
-	case RightViewport:
+	case SummaryPanel:
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
-	case SearchText:
+	case SearchPanel:
 		previousFilter := m.searchText.Value()
 
 		m.searchText, cmd = m.searchText.Update(msg)
@@ -648,37 +668,32 @@ func (m model) View() string {
 		return "Initializing UI..."
 	}
 
+	baseStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Padding(m.theme.panelsPadding...)
+
+	// Define the unselected style for each panel
+	searchPanelStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
+	booksPanelStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
+	summaryPanelStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
+
 	// Get current component
 	activeComponent := m.ActiveComponent()
 
-	// Define colors for left and right borders.
-	// Set both borders as unfocused by default
-	leftBorderColor := m.theme.unfocusedBorderColor
-	rightBorderColor := m.theme.unfocusedBorderColor
 	// Set active border to the focused style
 	switch activeComponent {
-	case LeftTable, SearchText:
-		leftBorderColor = m.theme.focusedBorderColor
-	case RightViewport:
-		fallthrough
-	default:
-		rightBorderColor = m.theme.focusedBorderColor
+	case SearchPanel:
+		searchPanelStyle = baseStyle.BorderForeground(m.theme.focusedBorderColor)
+	case BooksPanel:
+		booksPanelStyle = baseStyle.BorderForeground(m.theme.focusedBorderColor)
+	case SummaryPanel:
+		summaryPanelStyle = baseStyle.BorderForeground(m.theme.focusedBorderColor)
 	}
 
-	leftStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(leftBorderColor).
-		Padding(m.theme.panelsPadding...)
-
-	rightStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(rightBorderColor).
-		Padding(m.theme.panelsPadding...)
-
 	// Panels
-	m.panels.searchPanel.SetStyle(leftStyle)
-	m.panels.booksPanel.SetStyle(leftStyle)
-	m.panels.summaryPanel.SetStyle(rightStyle)
+	m.panels.searchPanel.SetStyle(searchPanelStyle)
+	m.panels.booksPanel.SetStyle(booksPanelStyle)
+	m.panels.summaryPanel.SetStyle(summaryPanelStyle)
 
 	leftTitle := m.theme.headerTextStyle.Render("Books")
 	rightTitle := m.theme.headerTextStyle.Render("Summary")
