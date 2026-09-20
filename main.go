@@ -78,9 +78,9 @@ const (
 	borderWidth           = 1
 	leftRightPaddingWidth = 1
 	scrollBarWidth        = 2                                     // For example " █", note the space before the scroll bar cursor
-	minTableItems         = 2                                     // Minimum number of data rows (excluding table's header rows)
+	minTableItems         = 1                                     // Minimum number of data rows (excluding table's header rows)
 	minTableHeight        = minTableItems + 2                     // A full table height includes 2 line table header
-	minContentHeight      = 6 + minTableItems                     // For right panel, that is: 2 lines for "Books" header + 2 lines for the table, minTableItems, 2 lines cursor indicator footer
+	minContentHeight      = 6 + minTableHeight                    // For right panel, that is: 2 lines for "Books" header + 2 lines for the table, minTableItems, 2 lines cursor indicator footer
 	minViewportTextWidth  = 1                                     // Minimum width of the text (exclusing the scroll bars characters)
 	minRightViewportWidth = minViewportTextWidth + scrollBarWidth // 1 character wide + scroll bar
 	minRightWidth         = minRightViewportWidth +
@@ -234,8 +234,8 @@ func hasBookChanged(before *Book, after *Book) bool {
 func tree() *layout.Node {
 	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
 		layout.ColWithName(LeftColumnName, layout.SizeSpec{Fixed: 40}, // column 1: fixed 40 cols wide
-			layout.Leaf(BooksPanelName, layout.SizeSpec{Grow: 1}),   // fills remaining height
-			layout.Leaf(SearchPanelName, layout.SizeSpec{Fixed: 3}), // fixed height
+			layout.Leaf(BooksPanelName, layout.SizeSpec{Grow: 1, Min: minContentHeight}), // fills remaining height, minimum height 9
+			layout.Leaf(SearchPanelName, layout.SizeSpec{Fixed: 3}),                      // fixed height
 		),
 		layout.Leaf(SummaryPanelName, layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
 	)
