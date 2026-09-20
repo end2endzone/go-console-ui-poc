@@ -374,6 +374,62 @@ func (m *model) FocusPreviousComponent() {
 	}
 }
 
+// GetPanels returns the list of all panels in the model
+func (m *model) GetPanels() []*layout.Node {
+	return []*layout.Node{
+		m.panels.booksPanel,
+		m.panels.searchPanel,
+		m.panels.summaryPanel,
+	}
+}
+
+// GetFocusedPanel returns the panels that contains the currently focused component
+func (m *model) GetPanelsByFocusState() (focusedPanel *layout.Node, unfocusedPanels []*layout.Node) {
+	// Get current component
+	activeComponent := m.ActiveComponent()
+
+	switch activeComponent {
+	case BooksPanel:
+		focusedPanel = m.panels.booksPanel
+		unfocusedPanels = []*layout.Node{
+			m.panels.searchPanel,
+			m.panels.summaryPanel,
+		}
+		return
+	case SummaryPanel:
+		focusedPanel = m.panels.summaryPanel
+		unfocusedPanels = []*layout.Node{
+			m.panels.booksPanel,
+			m.panels.searchPanel,
+		}
+		return
+	case SearchPanel:
+		focusedPanel = m.panels.searchPanel
+		unfocusedPanels = []*layout.Node{
+			m.panels.booksPanel,
+			m.panels.summaryPanel,
+		}
+		return
+	default:
+		return nil, m.GetPanels()
+	}
+}
+
+// GetPanelTitle gets the title of the given's panel.
+// Returns an empty string if the panel is unknown.
+func (m *model) GetPanelTitle(panel *layout.Node) string {
+	switch panel {
+	case m.panels.booksPanel:
+		return BooksPanelTitle
+	case m.panels.searchPanel:
+		return SearchPanelTitle
+	case m.panels.summaryPanel:
+		return SummaryPanelTitle
+	}
+
+	return ""
+}
+
 // SelectedBook returns the current Book selected in the left table.
 // Returns nil if no book is selected.
 func (m *model) SelectedBook() *Book {
@@ -683,39 +739,17 @@ func (m model) View() string {
 		Border(lipgloss.RoundedBorder()).
 		Padding(m.theme.panelsPadding...)
 
-	// Define the unselected style for each panel
-	{
-		unfocusedBorderStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
-		m.panels.searchPanel.Style = unfocusedBorderStyle
-		m.panels.booksPanel.Style = unfocusedBorderStyle
-		m.panels.summaryPanel.Style = unfocusedBorderStyle
-	}
+	// Get all panels by focus state
+	focusedPanel, unfocusedPanels := m.GetPanelsByFocusState()
 
-	// Define the unselected title style for each panel
-	{
-		m.panels.searchPanel.Title = m.theme.unfocusedPanelTitleStyle.Render(SearchPanelTitle)
-		m.panels.booksPanel.Title = m.theme.unfocusedPanelTitleStyle.Render(BooksPanelTitle)
-		m.panels.summaryPanel.Title = m.theme.unfocusedPanelTitleStyle.Render(SummaryPanelTitle)
-	}
+	// handle focus panel
+	focusedPanel.Style = baseStyle.BorderForeground(m.theme.focusedBorderColor)
+	focusedPanel.Title = m.theme.focusedPanelTitleStyle.Render(m.GetPanelTitle(focusedPanel))
 
-	// Get current component
-	activeComponent := m.ActiveComponent()
-
-	// Set active border & title to the focused panel
-	{
-		focusedBorderStyle := baseStyle.BorderForeground(m.theme.focusedBorderColor)
-		focusedTitleStyle := m.theme.focusedPanelTitleStyle
-		switch activeComponent {
-		case SearchPanel:
-			m.panels.searchPanel.Style = focusedBorderStyle
-			m.panels.searchPanel.Title = focusedTitleStyle.Render(SearchPanelTitle)
-		case BooksPanel:
-			m.panels.booksPanel.Style = focusedBorderStyle
-			m.panels.booksPanel.Title = focusedTitleStyle.Render(BooksPanelTitle)
-		case SummaryPanel:
-			m.panels.summaryPanel.Style = focusedBorderStyle
-			m.panels.summaryPanel.Title = focusedTitleStyle.Render(SummaryPanelTitle)
-		}
+	// handle unfocused panels
+	for _, p := range unfocusedPanels {
+		p.Style = baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
+		p.Title = m.theme.focusedPanelTitleStyle.Render(m.GetPanelTitle(p))
 	}
 
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
