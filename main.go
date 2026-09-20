@@ -47,11 +47,19 @@ const (
 	SummaryPanelName string = "SummaryPanel"
 )
 
+// Declare panel titles
+const (
+	SearchPanelTitle  string = "Search"
+	BooksPanelTitle   string = "Books"
+	SummaryPanelTitle string = "Summary"
+)
+
 type theme struct {
-	focusedBorderColor   lipgloss.Color
-	unfocusedBorderColor lipgloss.Color
-	panelsPadding        []int
-	headerTextStyle      lipgloss.Style
+	focusedBorderColor       lipgloss.Color
+	unfocusedBorderColor     lipgloss.Color
+	panelsPadding            []int
+	focusedPanelTitleStyle   lipgloss.Style
+	unfocusedPanelTitleStyle lipgloss.Style
 }
 
 type model struct {
@@ -79,8 +87,9 @@ const (
 	leftRightPaddingWidth = 1
 	scrollBarWidth        = 2                                     // For example " █", note the space before the scroll bar cursor
 	minTableItems         = 1                                     // Minimum number of data rows (excluding table's header rows)
-	minTableHeight        = minTableItems + 2                     // A full table height includes 2 line table header
-	minContentHeight      = 6 + minTableHeight                    // For right panel, that is: 2 lines for "Books" header + 2 lines for the table, minTableItems, 2 lines cursor indicator footer
+	tableHeaderHeight     = 2                                     // Tables renders columns names in a 2 lines header
+	minTableHeight        = minTableItems + tableHeaderHeight     // A full table height includes 2 line table header
+	minContentHeight      = 4 + minTableHeight                    // For right panel, that is: + 2 lines for the table, minTableItems, 2 lines cursor indicator footer
 	minViewportTextWidth  = 1                                     // Minimum width of the text (exclusing the scroll bars characters)
 	minRightViewportWidth = minViewportTextWidth + scrollBarWidth // 1 character wide + scroll bar
 	minRightWidth         = minRightViewportWidth +
@@ -90,10 +99,11 @@ const (
 
 func NewTheme() theme {
 	theme := theme{
-		focusedBorderColor:   lipgloss.Color("63"),
-		unfocusedBorderColor: lipgloss.Color("240"),
-		panelsPadding:        []int{0, 1, 0, 1}, // top, right, bottom, left
-		headerTextStyle:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")),
+		focusedBorderColor:       lipgloss.Color("63"),
+		unfocusedBorderColor:     lipgloss.Color("240"),
+		panelsPadding:            []int{0, 1, 0, 1}, // top, right, bottom, left
+		focusedPanelTitleStyle:   lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")).Bold(true),
+		unfocusedPanelTitleStyle: lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")).Bold(true),
 	}
 
 	return theme
@@ -299,11 +309,6 @@ func initialModel() model {
 	m.panels.searchPanel = m.layoutTree.Find(SearchPanelName)
 	m.panels.booksPanel = m.layoutTree.Find(BooksPanelName)
 	m.panels.summaryPanel = m.layoutTree.Find(SummaryPanelName)
-
-	// Set titles for each panels
-	m.panels.searchPanel.Title = "Search"
-	m.panels.booksPanel.Title = "Books"
-	m.panels.summaryPanel.Title = "Summary"
 
 	return m
 }
@@ -584,18 +589,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Resolve panels size based on available space
 		layout.Resolve(m.layoutTree, m.width, m.height-2) // 2 lines for the help string (the help string itself and a final \n)
 
-		tableHeight := m.panels.booksPanel.Borders.H - 2*borderWidth - 4 // 2 lines for "Books" header + 2 lines cursor indicator footer
+		tableHeight := m.panels.booksPanel.Borders.H - 2*borderWidth - 2 // 2 lines cursor indicator footer
 		m.table.SetHeight(tableHeight)
 
 		summaryContentRect := m.panels.summaryPanel.GetInnerRect()
 		summaryViewportWidth := summaryContentRect.W - scrollBarWidth
 
 		if !m.ready {
-			m.viewport = viewport.New(summaryViewportWidth, summaryContentRect.H-2) //right side has a 2 lines non-scrollable header
+			m.viewport = viewport.New(summaryViewportWidth, summaryContentRect.H)
 			m.ready = true
 		} else {
 			m.viewport.Width = summaryViewportWidth
-			m.viewport.Height = summaryContentRect.H - 2 //right side has a 2 lines non-scrollable header
+			m.viewport.Height = summaryContentRect.H
 		}
 
 		// The right viewport dimensions have changed.
@@ -679,37 +684,46 @@ func (m model) View() string {
 		Padding(m.theme.panelsPadding...)
 
 	// Define the unselected style for each panel
-	searchPanelStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
-	booksPanelStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
-	summaryPanelStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
+	{
+		unfocusedBorderStyle := baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
+		m.panels.searchPanel.Style = unfocusedBorderStyle
+		m.panels.booksPanel.Style = unfocusedBorderStyle
+		m.panels.summaryPanel.Style = unfocusedBorderStyle
+	}
+
+	// Define the unselected title style for each panel
+	{
+		m.panels.searchPanel.Title = m.theme.unfocusedPanelTitleStyle.Render(SearchPanelTitle)
+		m.panels.booksPanel.Title = m.theme.unfocusedPanelTitleStyle.Render(BooksPanelTitle)
+		m.panels.summaryPanel.Title = m.theme.unfocusedPanelTitleStyle.Render(SummaryPanelTitle)
+	}
 
 	// Get current component
 	activeComponent := m.ActiveComponent()
 
-	// Set active border to the focused style
-	switch activeComponent {
-	case SearchPanel:
-		searchPanelStyle = baseStyle.BorderForeground(m.theme.focusedBorderColor)
-	case BooksPanel:
-		booksPanelStyle = baseStyle.BorderForeground(m.theme.focusedBorderColor)
-	case SummaryPanel:
-		summaryPanelStyle = baseStyle.BorderForeground(m.theme.focusedBorderColor)
+	// Set active border & title to the focused panel
+	{
+		focusedBorderStyle := baseStyle.BorderForeground(m.theme.focusedBorderColor)
+		focusedTitleStyle := m.theme.focusedPanelTitleStyle
+		switch activeComponent {
+		case SearchPanel:
+			m.panels.searchPanel.Style = focusedBorderStyle
+			m.panels.searchPanel.Title = focusedTitleStyle.Render(SearchPanelTitle)
+		case BooksPanel:
+			m.panels.booksPanel.Style = focusedBorderStyle
+			m.panels.booksPanel.Title = focusedTitleStyle.Render(BooksPanelTitle)
+		case SummaryPanel:
+			m.panels.summaryPanel.Style = focusedBorderStyle
+			m.panels.summaryPanel.Title = focusedTitleStyle.Render(SummaryPanelTitle)
+		}
 	}
-
-	// Panels
-	m.panels.searchPanel.SetStyle(searchPanelStyle)
-	m.panels.booksPanel.SetStyle(booksPanelStyle)
-	m.panels.summaryPanel.SetStyle(summaryPanelStyle)
-
-	leftTitle := m.theme.headerTextStyle.Render("Books")
-	rightTitle := m.theme.headerTextStyle.Render("Summary")
 
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
 
 	// Panel's content
 	m.panels.searchPanel.SetContent(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ") + " " + m.searchText.View())
-	m.panels.booksPanel.SetContent(leftTitle + "\n\n" + m.table.View() + "\n\n" + positionIndicatorText)
-	m.panels.summaryPanel.SetContent(rightTitle + "\n\n" + m.renderViewportWithScrollbar())
+	m.panels.booksPanel.SetContent(m.table.View() + "\n\n" + positionIndicatorText)
+	m.panels.summaryPanel.SetContent(m.renderViewportWithScrollbar())
 
 	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
 		"Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",

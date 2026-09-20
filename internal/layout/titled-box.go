@@ -53,7 +53,7 @@ func renderTopBorderWithTitle(boxStyle lipgloss.Style, title string, width int) 
 	titleWidth := lipgloss.Width(title)
 
 	// Can we render the full title (including its offset position) on the top border?
-	titlePositionOnBorder := 10 // a value of 1 means there's top-left corner, a single `─` character then the title
+	titlePositionOnBorder := 2 // a value of 1 means there's top-left corner, a single `─` character then the title
 	trailWidth := middleWidth - titlePositionOnBorder - titleWidth
 	if trailWidth < 0 {
 		// Too short

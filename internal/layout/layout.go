@@ -90,6 +90,16 @@ func (root *Node) Find(name string) *Node {
 	return nil
 }
 
+// SetTitleUsingStyle sets the node's titles as rendered text using the current style colors of the node.
+func (n *Node) SetTitleUsingStyle(title string) {
+	borderForegroundColor := n.Style.GetBorderTopForeground()
+	borderBackgroundColor := n.Style.GetBorderTopBackground()
+	style := lipgloss.NewStyle().
+		Foreground(borderForegroundColor).
+		Background(borderBackgroundColor)
+	n.Title = style.Render(title)
+}
+
 func (n *Node) View() string {
 	inner := n.GetInnerRect()
 	boxStyle := n.Style.Width(inner.W).Height(inner.H)
@@ -100,9 +110,7 @@ func (n *Node) View() string {
 	}
 
 	// Render a border with a title otherwise
-	titleStyle := lipgloss.NewStyle().Background(lipgloss.Color("#cccccc")).Foreground(lipgloss.Color("#FF0000"))
-	titleRendered := titleStyle.Render(n.Title)
-	return RenderBorderWithTitle(boxStyle, titleRendered, n.Content)
+	return RenderBorderWithTitle(boxStyle, n.Title, n.Content)
 }
 
 // Rect is a resolved leaf's position and size in terminal cells.
