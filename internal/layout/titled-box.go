@@ -13,7 +13,7 @@ import (
 //	╭─Title─────────────────────────────────────────────────────╮
 //	│ ...content...                                             │
 //	╰───────────────────────────────────────────────────────────╯
-func RenderBorderWithTitle(boxStyle lipgloss.Style, title string, content string) string {
+func RenderBorderWithTitle(boxStyle lipgloss.Style, title string, titleStyle lipgloss.Style, content string) string {
 	// Let lipgloss render the box normally but without the top border.
 	bodyStyle := boxStyle.BorderTop(false)
 	body := bodyStyle.Render(content)
@@ -22,13 +22,13 @@ func RenderBorderWithTitle(boxStyle lipgloss.Style, title string, content string
 	// Use this width for renderoug out our manual top border line.
 	width := lipgloss.Width(body)
 
-	top := renderTopBorderWithTitle(boxStyle, title, width)
+	top := renderTopBorderWithTitle(boxStyle, title, titleStyle, width)
 
 	return top + "\n" + body
 }
 
 // renderTopBorderWithTitle renders just the top border line of a bordered style using a custom the styled title.
-func renderTopBorderWithTitle(boxStyle lipgloss.Style, title string, width int) string {
+func renderTopBorderWithTitle(boxStyle lipgloss.Style, title string, titleStyle lipgloss.Style, width int) string {
 	border := boxStyle.GetBorderStyle()
 
 	// Style for the plain parts of the border (corners + fill runes).
@@ -87,5 +87,7 @@ func renderTopBorderWithTitle(boxStyle lipgloss.Style, title string, width int) 
 	lead := borderRender.Render(strings.Repeat(border.Top, titlePositionOnBorder))
 	trail := borderRender.Render(strings.Repeat(border.Top, trailWidth))
 
-	return topLeft + lead + title + trail + topRight
+	styledTitle := titleStyle.Render(title)
+
+	return topLeft + lead + styledTitle + trail + topRight
 }

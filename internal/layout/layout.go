@@ -30,10 +30,11 @@ type Node struct {
 	Children []*Node
 
 	// Render properties
-	Title   string // title displayed on the border. Can be empty to render a normal border
-	Borders Rect   // dimensions of the panel's borders
-	Style   lipgloss.Style
-	Content string
+	Title        string // title displayed on the border. Can be empty to render a normal border
+	TitleStyle   lipgloss.Style
+	Borders      Rect // dimensions of the panel. Matches the panel's borders if the panel as a bordered style.
+	BordersStyle lipgloss.Style
+	Content      string
 }
 
 func (n *Node) IsLeaf() bool {
@@ -58,7 +59,7 @@ func (n *Node) SetContent(content string) {
 }
 
 func (n *Node) SetStyle(style lipgloss.Style) {
-	n.Style = style
+	n.BordersStyle = style
 }
 
 // Find looks up a Node by its name iteratively. The function is non-recusrive.
@@ -92,8 +93,8 @@ func (root *Node) Find(name string) *Node {
 
 // SetTitleUsingStyle sets the node's titles as rendered text using the current style colors of the node.
 func (n *Node) SetTitleUsingStyle(title string) {
-	borderForegroundColor := n.Style.GetBorderTopForeground()
-	borderBackgroundColor := n.Style.GetBorderTopBackground()
+	borderForegroundColor := n.BordersStyle.GetBorderTopForeground()
+	borderBackgroundColor := n.BordersStyle.GetBorderTopBackground()
 	style := lipgloss.NewStyle().
 		Foreground(borderForegroundColor).
 		Background(borderBackgroundColor)
@@ -102,7 +103,7 @@ func (n *Node) SetTitleUsingStyle(title string) {
 
 func (n *Node) View() string {
 	inner := n.GetInnerRect()
-	boxStyle := n.Style.Width(inner.W).Height(inner.H)
+	boxStyle := n.BordersStyle.Width(inner.W).Height(inner.H)
 
 	// Render a normal border if no title is specified
 	if n.Title == "" {
@@ -110,7 +111,7 @@ func (n *Node) View() string {
 	}
 
 	// Render a border with a title otherwise
-	return RenderBorderWithTitle(boxStyle, n.Title, n.Content)
+	return RenderBorderWithTitle(boxStyle, n.Title, n.TitleStyle, n.Content)
 }
 
 // Rect is a resolved leaf's position and size in terminal cells.
