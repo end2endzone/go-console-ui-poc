@@ -55,6 +55,18 @@ type theme struct {
 	unfocusedPanelTitleStyle lipgloss.Style
 }
 
+func NewTheme() theme {
+	theme := theme{
+		focusedBorderColor:       lipgloss.Color("63"),
+		unfocusedBorderColor:     lipgloss.Color("240"),
+		panelsPadding:            []int{0, 1, 0, 1}, // top, right, bottom, left
+		focusedPanelTitleStyle:   lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("205")).Bold(true),
+		unfocusedPanelTitleStyle: lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")),
+	}
+
+	return theme
+}
+
 type model struct {
 	theme           theme
 	books           []Book
@@ -89,18 +101,6 @@ const (
 		2*borderWidth +
 		2*leftRightPaddingWidth // 2 characters for border, 2 characters for padding
 )
-
-func NewTheme() theme {
-	theme := theme{
-		focusedBorderColor:       lipgloss.Color("63"),
-		unfocusedBorderColor:     lipgloss.Color("240"),
-		panelsPadding:            []int{0, 1, 0, 1}, // top, right, bottom, left
-		focusedPanelTitleStyle:   lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("205")).Bold(true),
-		unfocusedPanelTitleStyle: lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")),
-	}
-
-	return theme
-}
 
 // ReadBooksFromFile reads a JSON file and parses it into a slice of Books.
 func ReadBooksFromFile(filePath string) ([]Book, error) {
