@@ -300,6 +300,11 @@ func initialModel() model {
 	m.panels.booksPanel = m.layoutTree.Find(BooksPanelName)
 	m.panels.summaryPanel = m.layoutTree.Find(SummaryPanelName)
 
+	// Set titles for each panels
+	m.panels.searchPanel.Title = "Search"
+	m.panels.booksPanel.Title = "Books"
+	m.panels.summaryPanel.Title = "Summary"
+
 	return m
 }
 

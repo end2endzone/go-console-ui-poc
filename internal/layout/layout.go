@@ -30,7 +30,8 @@ type Node struct {
 	Children []*Node
 
 	// Render properties
-	Borders Rect // dimensions of the panel's borders
+	Title   string // title displayed on the border. Can be empty to render a normal border
+	Borders Rect   // dimensions of the panel's borders
 	Style   lipgloss.Style
 	Content string
 }
@@ -91,7 +92,17 @@ func (root *Node) Find(name string) *Node {
 
 func (n *Node) View() string {
 	inner := n.GetInnerRect()
-	return n.Style.Width(inner.W).Height(inner.H).Render(n.Content)
+	boxStyle := n.Style.Width(inner.W).Height(inner.H)
+
+	// Render a normal border if no title is specified
+	if n.Title == "" {
+		return boxStyle.Render(n.Content)
+	}
+
+	// Render a border with a title otherwise
+	titleStyle := lipgloss.NewStyle().Background(lipgloss.Color("#cccccc")).Foreground(lipgloss.Color("#FF0000"))
+	titleRendered := titleStyle.Render(n.Title)
+	return RenderBorderWithTitle(boxStyle, titleRendered, n.Content)
 }
 
 // Rect is a resolved leaf's position and size in terminal cells.
