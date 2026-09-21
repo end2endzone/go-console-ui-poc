@@ -32,10 +32,10 @@ var _ tea.Model = (*model)(nil)
 type ActiveComponent int
 
 const (
-	Unknown        ActiveComponent = iota // 0
-	BooksPanel                            // 1
-	SummaryPanel                          // 2
-	SearchPanel                           // 3
+	UnknownPanelId ActiveComponent = iota // 0
+	BooksPanelId                          // 1
+	SummaryPanelId                        // 2
+	SearchPanelId                         // 3
 	ComponentCount = 3
 )
 
@@ -287,7 +287,7 @@ func initialModel() model {
 	}
 
 	// Focus books by default
-	m.FocusComponent(BooksPanel)
+	m.FocusComponent(BooksPanelId)
 
 	// Fill Table
 	m.FillBooksTable("")
@@ -314,28 +314,28 @@ func initialModel() model {
 // ActiveComponent return the active focused component in the main UI.
 func (m *model) ActiveComponent() ActiveComponent {
 	if m.table.Focused() {
-		return BooksPanel
+		return BooksPanelId
 	} else if m.viewportFocused {
-		return SummaryPanel
+		return SummaryPanelId
 	} else if m.searchText.Focused() {
-		return SearchPanel
+		return SearchPanelId
 	}
 
-	return Unknown
+	return UnknownPanelId
 }
 
 // FocusComponent focuses the given component and blur other components.
 func (m *model) FocusComponent(c ActiveComponent) {
 	switch c {
-	case BooksPanel:
+	case BooksPanelId:
 		m.table.Focus()
 		m.viewportFocused = false
 		m.searchText.Blur()
-	case SummaryPanel:
+	case SummaryPanelId:
 		m.table.Blur()
 		m.viewportFocused = true
 		m.searchText.Blur()
-	case SearchPanel:
+	case SearchPanelId:
 		m.table.Blur()
 		m.viewportFocused = false
 		m.searchText.Focus()
@@ -352,14 +352,14 @@ func (m *model) FocusNextComponent() {
 	activeComponent := m.ActiveComponent()
 
 	switch activeComponent {
-	case BooksPanel:
-		m.FocusComponent(SearchPanel)
-	case SummaryPanel:
-		m.FocusComponent(BooksPanel)
-	case SearchPanel:
-		m.FocusComponent(SummaryPanel)
+	case BooksPanelId:
+		m.FocusComponent(SearchPanelId)
+	case SummaryPanelId:
+		m.FocusComponent(BooksPanelId)
+	case SearchPanelId:
+		m.FocusComponent(SummaryPanelId)
 	default:
-		m.FocusComponent(BooksPanel)
+		m.FocusComponent(BooksPanelId)
 	}
 }
 
@@ -387,21 +387,21 @@ func (m *model) GetPanelsByFocusState() (focusedPanel *layout.Node, unfocusedPan
 	activeComponent := m.ActiveComponent()
 
 	switch activeComponent {
-	case BooksPanel:
+	case BooksPanelId:
 		focusedPanel = m.panels.booksPanel
 		unfocusedPanels = []*layout.Node{
 			m.panels.searchPanel,
 			m.panels.summaryPanel,
 		}
 		return
-	case SummaryPanel:
+	case SummaryPanelId:
 		focusedPanel = m.panels.summaryPanel
 		unfocusedPanels = []*layout.Node{
 			m.panels.booksPanel,
 			m.panels.searchPanel,
 		}
 		return
-	case SearchPanel:
+	case SearchPanelId:
 		focusedPanel = m.panels.searchPanel
 		unfocusedPanels = []*layout.Node{
 			m.panels.booksPanel,
@@ -411,6 +411,20 @@ func (m *model) GetPanelsByFocusState() (focusedPanel *layout.Node, unfocusedPan
 	default:
 		return nil, m.GetPanels()
 	}
+}
+
+// GetPanelFromId gets the matching panel given a panel id.
+// Returns nil if the panel id is unknown.
+func (m *model) GetPanelFromId(id ActiveComponent) *layout.Node {
+	switch id {
+	case SearchPanelId:
+		return m.panels.searchPanel
+	case BooksPanelId:
+		return m.panels.booksPanel
+	case SummaryPanelId:
+		return m.panels.summaryPanel
+	}
+	return nil
 }
 
 // SelectedBook returns the current Book selected in the left table.
@@ -649,7 +663,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q":
-			if activeComponent != SearchPanel {
+			if activeComponent != SearchPanelId {
 				// only allow q to quit when its not the search string that has focus
 				return m, tea.Quit
 			}
@@ -664,10 +678,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "right", "left":
 			// Quickly change from between left and right panels
 			switch activeComponent {
-			case BooksPanel:
-				m.FocusComponent(SummaryPanel)
-			case SummaryPanel:
-				m.FocusComponent(BooksPanel)
+			case BooksPanelId:
+				m.FocusComponent(SummaryPanelId)
+			case SummaryPanelId:
+				m.FocusComponent(BooksPanelId)
 			}
 		}
 	}
@@ -675,7 +689,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// The message was not consumed by previous code.
 	// Delegate the msg to the active panel
 	switch activeComponent {
-	case BooksPanel:
+	case BooksPanelId:
 		previousBookPtr := m.SelectedBook()
 
 		m.table, cmd = m.table.Update(msg)
@@ -691,10 +705,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// And move the right viewport to the top of the view
 			m.viewport.GotoTop()
 		}
-	case SummaryPanel:
+	case SummaryPanelId:
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
-	case SearchPanel:
+	case SearchPanelId:
 		previousFilter := m.searchText.Value()
 
 		m.searchText, cmd = m.searchText.Update(msg)
