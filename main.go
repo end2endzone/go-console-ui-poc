@@ -29,13 +29,13 @@ type Book struct {
 var _ tea.Model = (*model)(nil)
 
 // Focusable elements of the UI
-type ActiveComponent int
+type UIComponent int
 
 const (
-	UnknownPanelId ActiveComponent = iota // 0
-	BooksPanelId                          // 1
-	SummaryPanelId                        // 2
-	SearchPanelId                         // 3
+	UnknownPanelId UIComponent = iota // 0
+	BooksPanelId                      // 1
+	SummaryPanelId                    // 2
+	SearchPanelId                     // 3
 	ComponentCount = 3
 )
 
@@ -312,7 +312,7 @@ func initialModel() model {
 }
 
 // ActiveComponent return the active focused component in the main UI.
-func (m *model) ActiveComponent() ActiveComponent {
+func (m *model) ActiveComponent() UIComponent {
 	if m.table.Focused() {
 		return BooksPanelId
 	} else if m.viewportFocused {
@@ -325,7 +325,7 @@ func (m *model) ActiveComponent() ActiveComponent {
 }
 
 // FocusComponent focuses the given component and blur other components.
-func (m *model) FocusComponent(c ActiveComponent) {
+func (m *model) FocusComponent(c UIComponent) {
 	switch c {
 	case BooksPanelId:
 		m.table.Focus()
@@ -415,7 +415,7 @@ func (m *model) GetPanelsByFocusState() (focusedPanel *layout.Node, unfocusedPan
 
 // GetPanelFromId gets the matching panel given a panel id.
 // Returns nil if the panel id is unknown.
-func (m *model) GetPanelFromId(id ActiveComponent) *layout.Node {
+func (m *model) GetPanelFromId(id UIComponent) *layout.Node {
 	switch id {
 	case SearchPanelId:
 		return m.panels.searchPanel
