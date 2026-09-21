@@ -47,28 +47,33 @@ const (
 	SummaryPanelName string = "SummaryPanel"
 )
 
-type theme struct {
-	focusedBorderColor       lipgloss.Color
-	unfocusedBorderColor     lipgloss.Color
-	panelsPadding            []int
-	focusedPanelTitleStyle   lipgloss.Style
-	unfocusedPanelTitleStyle lipgloss.Style
+type PanelStyles struct {
+	TitleStyle  lipgloss.Style
+	BorderStyle lipgloss.Style
 }
 
-func NewTheme() theme {
-	theme := theme{
-		focusedBorderColor:       lipgloss.Color("63"),
-		unfocusedBorderColor:     lipgloss.Color("240"),
-		panelsPadding:            []int{0, 1, 0, 1}, // top, right, bottom, left
-		focusedPanelTitleStyle:   lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("205")).Bold(true),
-		unfocusedPanelTitleStyle: lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")),
+type Theme struct {
+	FocusedPanel   PanelStyles
+	UnfocusedPanel PanelStyles
+}
+
+func NewTheme() Theme {
+	theme := Theme{
+		FocusedPanel: PanelStyles{
+			BorderStyle: lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")),
+			TitleStyle:  lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("63")).Bold(true),
+		},
+		UnfocusedPanel: PanelStyles{
+			BorderStyle: lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")),
+			TitleStyle:  lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")),
+		},
 	}
 
 	return theme
 }
 
 type model struct {
-	theme           theme
+	theme           Theme
 	books           []Book
 	filteredBooks   []*Book
 	table           table.Model
@@ -732,21 +737,17 @@ func (m model) View() string {
 		return "Initializing UI..."
 	}
 
-	baseStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Padding(m.theme.panelsPadding...)
-
 	// Get all panels by focus state
 	focusedPanel, unfocusedPanels := m.GetPanelsByFocusState()
 
 	// handle focus panel
-	focusedPanel.BordersStyle = baseStyle.BorderForeground(m.theme.focusedBorderColor)
-	focusedPanel.TitleStyle = m.theme.focusedPanelTitleStyle
+	focusedPanel.BordersStyle = m.theme.FocusedPanel.BorderStyle
+	focusedPanel.TitleStyle = m.theme.FocusedPanel.TitleStyle
 
 	// handle unfocused panels
 	for _, p := range unfocusedPanels {
-		p.BordersStyle = baseStyle.BorderForeground(m.theme.unfocusedBorderColor)
-		p.TitleStyle = m.theme.unfocusedPanelTitleStyle
+		p.BordersStyle = m.theme.UnfocusedPanel.BorderStyle
+		p.TitleStyle = m.theme.UnfocusedPanel.TitleStyle
 	}
 
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
