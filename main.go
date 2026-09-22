@@ -81,8 +81,8 @@ func NewTheme() Theme {
 			BorderBottom(true).
 			Bold(true)
 		tmp.Selected = tmp.Selected.
-			Foreground(White).
-			Background(lipgloss.Color("57")).
+			Foreground(theme.FocusedPanel.TitleStyle.GetForeground()). // use same colors as the border
+			Background(theme.FocusedPanel.TitleStyle.GetBackground()). // use same colors as the border
 			Bold(true)
 		theme.FocusedPanel.BooksTableStyles = tmp
 	}
@@ -91,8 +91,8 @@ func NewTheme() Theme {
 	// Basicaly, remove background colors when unselected.
 	theme.UnfocusedPanel.BooksTableStyles.Header = theme.FocusedPanel.BooksTableStyles.Header
 	theme.UnfocusedPanel.BooksTableStyles.Selected = theme.FocusedPanel.BooksTableStyles.Selected.
-		Foreground(Black).
-		Background(BrightBlack)
+		Foreground(theme.FocusedPanel.TitleStyle.GetBackground()).
+		UnsetBackground()
 
 	return theme
 }
