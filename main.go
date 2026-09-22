@@ -91,7 +91,7 @@ func NewTheme() Theme {
 	// Basicaly, remove background colors when unselected.
 	theme.UnfocusedPanel.BooksTableStyles.Header = theme.FocusedPanel.BooksTableStyles.Header
 	theme.UnfocusedPanel.BooksTableStyles.Selected = theme.FocusedPanel.BooksTableStyles.Selected.
-		Foreground(theme.FocusedPanel.TitleStyle.GetBackground()).
+		Foreground(BrightBlue).
 		UnsetBackground()
 
 	return theme
