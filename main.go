@@ -48,8 +48,9 @@ const (
 )
 
 type PanelStyles struct {
-	TitleStyle  lipgloss.Style
-	BorderStyle lipgloss.Style
+	TitleStyle       lipgloss.Style
+	BorderStyle      lipgloss.Style
+	BooksTableStyles table.Styles
 }
 
 type Theme struct {
@@ -60,14 +61,38 @@ type Theme struct {
 func NewTheme() Theme {
 	theme := Theme{
 		FocusedPanel: PanelStyles{
-			BorderStyle: lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")),
-			TitleStyle:  lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("63")).Bold(true),
+			BorderStyle:      lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")),
+			TitleStyle:       lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("63")).Bold(true),
+			BooksTableStyles: table.DefaultStyles(),
 		},
 		UnfocusedPanel: PanelStyles{
-			BorderStyle: lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")),
-			TitleStyle:  lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")),
+			BorderStyle:      lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")),
+			TitleStyle:       lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("205")),
+			BooksTableStyles: table.DefaultStyles(),
 		},
 	}
+
+	// Set table.Styles for focused tables
+	{
+		tmp := table.DefaultStyles()
+		tmp.Header = tmp.Header.
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			BorderBottom(true).
+			Bold(true)
+		tmp.Selected = tmp.Selected.
+			Foreground(White).
+			Background(lipgloss.Color("57")).
+			Bold(true)
+		theme.FocusedPanel.BooksTableStyles = tmp
+	}
+
+	// Set table.Styles for unfocused tables
+	// Basicaly, remove background colors when unselected.
+	theme.UnfocusedPanel.BooksTableStyles.Header = theme.FocusedPanel.BooksTableStyles.Header
+	theme.UnfocusedPanel.BooksTableStyles.Selected = theme.FocusedPanel.BooksTableStyles.Selected.
+		Foreground(Black).
+		Background(BrightBlack)
 
 	return theme
 }
@@ -265,18 +290,6 @@ func initialModel() model {
 		table.WithColumns(columns),
 		table.WithFocused(true),
 	)
-
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(true)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(true)
-	t.SetStyles(s)
 
 	searchText := textinput.New()
 	searchText.Placeholder = "filter"
@@ -748,6 +761,13 @@ func (m model) View() string {
 	for _, p := range unfocusedPanels {
 		p.BordersStyle = m.theme.UnfocusedPanel.BorderStyle
 		p.TitleStyle = m.theme.UnfocusedPanel.TitleStyle
+	}
+
+	// Update the books table styles based on focused panel
+	if m.panels.booksPanel == focusedPanel {
+		m.table.SetStyles(m.theme.FocusedPanel.BooksTableStyles)
+	} else {
+		m.table.SetStyles(m.theme.UnfocusedPanel.BooksTableStyles)
 	}
 
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
