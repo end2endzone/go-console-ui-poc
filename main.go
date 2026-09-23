@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/end2endzone/go-console-ui-poc/internal/layout"
+	"github.com/end2endzone/go-console-ui-poc/internal/layout/navigation"
 )
 
 type Book struct {
@@ -101,6 +102,7 @@ type model struct {
 	theme           Theme
 	books           []Book
 	filteredBooks   []*Book
+	navigation      navigation.Model
 	table           table.Model
 	viewport        viewport.Model
 	viewportFocused bool
@@ -304,9 +306,6 @@ func initialModel() model {
 		layoutTree: tree(),
 	}
 
-	// Focus books by default
-	m.FocusComponent(BooksPanelId)
-
 	// Fill Table
 	m.FillBooksTable("")
 
@@ -325,6 +324,14 @@ func initialModel() model {
 	m.panels.searchPanel.Title = "Search"
 	m.panels.booksPanel.Title = "Books"
 	m.panels.summaryPanel.Title = "Summary"
+
+	// Setup navigation panels
+	m.navigation.IDs = []int{int(BooksPanelId), int(SearchPanelId), int(SummaryPanelId)}
+	m.navigation.SetFocusedComponentByValue(int(BooksPanelId))
+
+	// Focus books by default
+	activeComponent := UIComponent(m.navigation.CurrentFocusedComponent())
+	m.FocusComponent(activeComponent)
 
 	return m
 }
@@ -362,32 +369,27 @@ func (m *model) FocusComponent(c UIComponent) {
 		m.viewportFocused = false
 		m.searchText.Blur()
 	}
+
+	// Sync navigation pane
+	m.navigation.SetFocusedComponentByValue(int(c))
 }
 
 // FocusNextComponent focuses the next component.
 func (m *model) FocusNextComponent() {
-	// Get current component
-	activeComponent := m.ActiveComponent()
+	// Move navigation's focus to the next component
+	newFocusedComponent := UIComponent(m.navigation.NextFocusedComponent())
 
-	switch activeComponent {
-	case BooksPanelId:
-		m.FocusComponent(SearchPanelId)
-	case SummaryPanelId:
-		m.FocusComponent(BooksPanelId)
-	case SearchPanelId:
-		m.FocusComponent(SummaryPanelId)
-	default:
-		m.FocusComponent(BooksPanelId)
-	}
+	// Make it actually focused and blur others
+	m.FocusComponent(newFocusedComponent)
 }
 
 // FocusPreviousComponent focuses the previous component.
 func (m *model) FocusPreviousComponent() {
+	// Move navigation's focus to the previous component
+	newFocusedComponent := UIComponent(m.navigation.PreviousFocusedComponent())
 
-	// To get a mirrored previous cycle, we move forward n-1 times
-	for i := ComponentCount - 1; i > 0; i-- {
-		m.FocusNextComponent()
-	}
+	// Make it actually focused and blur others
+	m.FocusComponent(newFocusedComponent)
 }
 
 // GetPanels returns the list of all panels in the model
@@ -543,6 +545,9 @@ func (m *model) renderViewportWithScrollbar() string {
 	// `str = alignTextHorizontal(str, horizontalAlign, width, st)`.
 	// To work around this, we temporary shrink the width of the viewport to prevent padding.
 	m.viewport.Width -= scrollBarWidth
+	if m.viewport.Width < 0 {
+		m.viewport.Width = 0
+	}
 	viewportView := m.viewport.View()
 	m.viewport.Width += scrollBarWidth
 
