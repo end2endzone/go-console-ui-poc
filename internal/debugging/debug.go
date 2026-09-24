@@ -1,4 +1,4 @@
-package main
+package debugging
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// dumpToFile writes a debug string to the given file path.
-func dumpToFile(filename string, data string) {
+// DumpStringToFile writes a debug string to the given file path.
+func DumpStringToFile(filename string, data string) {
 	// 0644 is the file permission mode (read/write for owner, read-only for others)
 	err := os.WriteFile(filename, []byte(data), 0644)
 	if err != nil {
@@ -21,9 +21,18 @@ func dumpToFile(filename string, data string) {
 
 func RenderAllColors() string {
 	var out string
+	out = "Backgrounds: "
 	for i := 0; i < 16; i++ {
 		style := lipgloss.NewStyle().
 			Background(lipgloss.ANSIColor(i)).
+			Bold(true)
+		out += " " + style.Render(fmt.Sprintf(" %d ", i)) + " "
+	}
+	out += "\n"
+	out += "Foreground: "
+	for i := 0; i < 16; i++ {
+		style := lipgloss.NewStyle().
+			Foreground(lipgloss.ANSIColor(i)).
 			Bold(true)
 		out += " " + style.Render(fmt.Sprintf(" %d ", i)) + " "
 	}
@@ -48,8 +57,8 @@ func StripStyles(renderedView string) string {
 	return string(ansi.Strip(renderedView))
 }
 
-// StripStylesAndDumpToFile remove styles and writes a debug string to the given file path.
-func StripStylesAndDumpToFile(filename string, data string) {
+// DumpRenderingWithoutStylesToFile remove styles and writes a debug string to the given file path.
+func DumpRenderingWithoutStylesToFile(filename string, data string) {
 	noStyles := StripStyles(data)
 
 	// 0644 is the file permission mode (read/write for owner, read-only for others)
