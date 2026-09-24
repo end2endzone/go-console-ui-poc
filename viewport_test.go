@@ -63,7 +63,7 @@ func AssertViewOutputLines(expectedLines []string, actual string) error {
 	return nil
 }
 
-func TestFooBar(t *testing.T) {
+func TestViewportBehavior(t *testing.T) {
 	/*
 		Viewport rules
 			1. A viewport truncates its content horizontally and vertically to the size of the viewport.
@@ -97,6 +97,9 @@ func TestFooBar(t *testing.T) {
 	vp /*cmd*/, _ = vp.Update(keyDownMsg)
 	vp.ScrollDown(1) // again
 
+	// Setting content again will not move the viewport's scrolled cursor.
+	vp.SetContent(wrappedText)
+
 	// Render the view
 	view := vp.View()
 
@@ -123,4 +126,187 @@ func TestFooBar(t *testing.T) {
 
 	err := AssertViewOutputLines(expectedOutput, actualOutput)
 	require.NoError(t, err)
+}
+
+func IsViewportBordered(vp *viewport.Model) bool {
+	if vp.Style.GetBorderTop() ||
+		vp.Style.GetBorderBottom() ||
+		vp.Style.GetBorderLeft() ||
+		vp.Style.GetBorderRight() {
+		return true
+	}
+	return false
+}
+
+func ViewportViewWithVerticalScrollBar(vp *viewport.Model, content string) string {
+	if vp.Width == 0 || vp.Height == 0 {
+		return ""
+	}
+
+	if IsViewportBordered(vp) {
+		return vp.View() // feature unsupported
+	}
+
+	ThumbSymbol := "█"
+	TrackSymbol := "|"
+	scrollBarWidth := 1 + max(lipgloss.Width(ThumbSymbol), lipgloss.Width(TrackSymbol)) // a space then the symbol
+
+	ThumbStyle := lipgloss.NewStyle().Foreground(lipgloss.ANSIColor(8)).Bold(true)
+	TrackStyle := lipgloss.NewStyle().Foreground(lipgloss.ANSIColor(8))
+
+	// Explicitly wrap the text to the viewport's target width - scrollBarWidth to add the right scrollbar
+	wrappedText := lipgloss.NewStyle().Width(vp.Width - scrollBarWidth).Render(harryPotterBookDescription)
+
+	// Set the pre-wrapped multi-line text into the viewport
+	/*before := vp.ScrollPercent()
+	if before == 123.4567 {
+		return ""
+	}*/
+	vp.SetContent(wrappedText)
+	/*after := vp.ScrollPercent()
+	if after == 123.4567 {
+		return ""
+	}*/
+
+	viewportView := vp.View()
+
+	// Split by line to be able to manipulate lines individually
+	lines := strings.Split(viewportView, "\n")
+	vpHeight := len(lines) // number of line displayed
+	if vpHeight == 0 {
+		// If viewport content is empty, return immediately
+		return viewportView
+	}
+
+	// Determine scroll thumb position
+	scrollPercent := vp.ScrollPercent()
+	thumbPos := int(scrollPercent * float64(vpHeight-1))
+
+	// Fix thumbPos if we are at the top most or botto mmost viewport
+	if vp.AtBottom() {
+		thumbPos = vpHeight - 1
+	}
+	if vp.AtTop() {
+		thumbPos = 0
+	}
+
+	// Append scrollbar characters at the end of each displayed line
+	var output strings.Builder
+	for i, line := range lines {
+		var scrollSymbol string
+		if i == thumbPos {
+			scrollSymbol = ThumbStyle.Render(ThumbSymbol)
+		} else {
+			scrollSymbol = TrackStyle.Render(TrackSymbol)
+		}
+
+		// Print the line itself and then the scrollbar
+		output.WriteString(fmt.Sprintf("%s %s", line, scrollSymbol))
+
+		isLast := (i + 1) == len(lines)
+		if !isLast {
+			output.WriteString("\n")
+		}
+	}
+
+	return output.String()
+
+}
+
+func TestViewportViewWithVerticalScrollBar(t *testing.T) {
+	vp := viewport.New(80, 10)
+
+	content := harryPotterBookDescription
+
+	t.Run("No scroll at all", func(t *testing.T) {
+		// Render the viewport with scrollbar
+		view := ViewportViewWithVerticalScrollBar(&vp, content)
+
+		// Strip ANSI colors/styles so we can perform reliable structural string assertions
+		actualOutput := StripStyles(view)
+
+		expectedOutput := []string{
+			"Harry Potter and the Philosopher's Stone (published in the United States as      █",
+			"Harry Potter and the Sorcerer's Stone) is the fantasy novel that launched the    |",
+			"globally acclaimed series by British author J. K. Rowling. The novel             |",
+			"introduces Harry Potter, a young boy who discovers on his eleventh birthday      |",
+			"that he is an orphaned wizard with a mysterious past, setting the stage for      |",
+			"one of the most successful franchises in literary and cinematic history.         |",
+			"                                                                                 |",
+			"Raised by his abusive aunt, uncle, and cousin, Harry has lived a miserable       |",
+			"existence sleeping in a cupboard under the stairs. Everything changes when he    |",
+			"receives a acceptance letter to Hogwarts School of Witchcraft and Wizardry,      |",
+		}
+
+		boxSymbol := "•"
+		actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
+		expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
+
+		err := AssertViewOutputLines(expectedOutput, actualOutput)
+		require.NoError(t, err)
+	})
+
+	t.Run("Scrolled 3 line", func(t *testing.T) {
+		vp.ScrollDown(3)
+
+		// Render the viewport with scrollbar
+		view := ViewportViewWithVerticalScrollBar(&vp, content)
+
+		// Strip ANSI colors/styles so we can perform reliable structural string assertions
+		actualOutput := StripStyles(view)
+
+		expectedOutput := []string{
+			"introduces Harry Potter, a young boy who discovers on his eleventh birthday      |",
+			"that he is an orphaned wizard with a mysterious past, setting the stage for      |",
+			"one of the most successful franchises in literary and cinematic history.         █",
+			"                                                                                 |",
+			"Raised by his abusive aunt, uncle, and cousin, Harry has lived a miserable       |",
+			"existence sleeping in a cupboard under the stairs. Everything changes when he    |",
+			"receives a acceptance letter to Hogwarts School of Witchcraft and Wizardry,      |",
+			"delivered by a half-giant named Rubeus Hagrid. Harry learns that his parents     |",
+			"were powerful magical figures murdered by the dark wizard Lord Voldemort, and    |",
+			"that Harry miraculously survived Voldemort's killing curse as an infant,         |",
+		}
+
+		boxSymbol := "•"
+		actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
+		expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
+
+		err := AssertViewOutputLines(expectedOutput, actualOutput)
+		require.NoError(t, err)
+	})
+
+	t.Run("At the bottom", func(t *testing.T) {
+		vp.GotoBottom()
+
+		// Render the viewport with scrollbar
+		view := ViewportViewWithVerticalScrollBar(&vp, content)
+
+		// Strip ANSI colors/styles so we can perform reliable structural string assertions
+		actualOutput := StripStyles(view)
+
+		expectedOutput := []string{
+			"were powerful magical figures murdered by the dark wizard Lord Voldemort, and    |",
+			"that Harry miraculously survived Voldemort's killing curse as an infant,         |",
+			"leaving him with a lightning-bolt scar and legendary status in the wizarding     |",
+			"world. At Hogwarts, Harry makes lifelong friends in Ron Weasley and Hermione     |",
+			"Granger, and begins his education in magic. However, strange events at the       |",
+			"school lead the trio to discover that the Philosopher's Stone—a magical object   |",
+			"granting immortality—is hidden within the castle and under threat. Believing a   |",
+			"hostile professor is attempting to steal it for the weakened Voldemort, Harry    |",
+			"and his friends navigate a series of deadly magical obstacles to protect the     |",
+			"stone, confronting the true agent of evil in a dramatic final showdown.          █",
+		}
+
+		boxSymbol := "•"
+		actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
+		expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
+
+		err := AssertViewOutputLines(expectedOutput, actualOutput)
+		require.NoError(t, err)
+	})
+
 }
