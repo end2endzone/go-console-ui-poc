@@ -9,17 +9,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type mainModel struct {
+type Model struct {
 	Width  int
 	Height int
 	Text   string
 }
 
-func (m mainModel) Init() tea.Cmd {
+func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -197,7 +197,7 @@ func GetStyleExpectedOutputSize(s lipgloss.Style) (int, int) {
 	return width, height
 }
 
-func (m mainModel) View() string {
+func (m Model) View() string {
 
 	style := lipgloss.NewStyle().
 		Width(80).
@@ -221,7 +221,7 @@ func (m mainModel) View() string {
 }
 
 func main() {
-	model := mainModel{
+	model := Model{
 		Text: "The Little Prince (Le Petit Prince) is a novella by French aristocrat, writer, and military aviator Antoine de Saint-Exupéry. First published in English and French in the United States in April 1943, it is one of the most translated and best-selling books in history. The story follows a young prince who visits various planets in space, including Earth, addressing themes of loneliness, friendship, love, and loss. Despite its style as a children's book, The Little Prince makes observations about life and human nature that resonate deeply with adult readers.", // \n\nThe narrative begins with an aviator stranded in the Sahara Desert after his plane crashes. While attempting to repair his engine, he meets a extraordinary boy dubbed 'the Little Prince.' The prince shares stories of his small home asteroid, B-612, where he spent his days raking out volcanoes and caring for a beautiful but proud rose. Feeling neglected by the rose, he set off on a journey across the cosmos. Along the way, he visits six other asteroids, each inhabited by an adult who embodies a flawed aspect of society: a king with no subjects, a vain man seeking admiration, a drunkard drinking to forget shame, a businessman counting stars he claims to own, a lamplighter bound by obsolete orders, and a geographer who knows nothing of his own world. Upon arriving on Earth, the prince learns vital life lessons about what truly matters from a wild fox, who teaches him that 'one sees clearly only with the heart; what is essential is invisible to the eye.'",
 		//Text: "1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz",
 	}
