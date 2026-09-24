@@ -207,33 +207,31 @@ func ViewportViewWithVerticalScrollBar(vp *viewport.Model, content string) strin
 	// When rendering smaller/shorter content, the rendering process will add empty rows.
 	// Sending these empty rows to the viewport will make them actually scrollable which is undesired.
 	wrappedText := lipgloss.NewStyle().
-		Width(vp.Width - scrollBarWidth /*- borderWidthIfPresent*/).
-		//Height(vp.Width - borderHeightIfPresent).
+		Width(vp.Width - scrollBarWidth).
 		Render(content)
 
 	// Set the pre-wrapped multi-line text into the viewport
-	/*before := vp.ScrollPercent()
-	if before == 123.4567 {
-		return ""
-	}*/
+	//before := vp.ScrollPercent()
+	//if before == 123.4567 {
+	//	return ""
+	//}
 	vp.SetContent(wrappedText)
-	/*after := vp.ScrollPercent()
-	if after == 123.4567 {
-		return ""
-	}*/
+	//after := vp.ScrollPercent()
+	//if after == 123.4567 {
+	//	return ""
+	//}
 
-	// Temporary patch the viewport's width and height to prevent the viewport from adding additionnal padding.
+	// Temporary patch the viewport's width to match the content style's width.
+	// Without this, the viewport will add additionnal padding at the end of each row to match its width.
 	// Then render the View().
-	vp.Width -= scrollBarWidth /*+ borderWidthIfPresent*/
-	//vp.Height -= borderHeightIfPresent
+	vp.Width -= scrollBarWidth
 	tmpViewportView := vp.View()
-	vp.Width += scrollBarWidth /*+ borderWidthIfPresent*/
-	//vp.Height += borderHeightIfPresent
+	vp.Width += scrollBarWidth
 
-	tmpViewportViewWidth := lipgloss.Width(tmpViewportView)
-	if tmpViewportViewWidth == 1234567 {
-		return ""
-	}
+	//tmpViewportViewWidth := lipgloss.Width(tmpViewportView)
+	//if tmpViewportViewWidth == 1234567 {
+	//	return ""
+	//}
 
 	// Split by line to be able to manipulate lines individually
 	lines := strings.Split(tmpViewportView, "\n")
@@ -275,10 +273,10 @@ func ViewportViewWithVerticalScrollBar(vp *viewport.Model, content string) strin
 	}
 
 	newViewportView := output.String()
-	newViewportViewWidth := lipgloss.Width(newViewportView)
-	if newViewportViewWidth == 1234567 {
-		return ""
-	}
+	//newViewportViewWidth := lipgloss.Width(newViewportView)
+	//if newViewportViewWidth == 1234567 {
+	//	return ""
+	//}
 
 	// Add a border if the original viewport was bordered
 	if bordered {
@@ -291,10 +289,10 @@ func ViewportViewWithVerticalScrollBar(vp *viewport.Model, content string) strin
 		newViewportView = style.Render(newViewportView)
 	}
 
-	finalViewportViewWidth := lipgloss.Width(newViewportView)
-	if finalViewportViewWidth == 1234567 {
-		return ""
-	}
+	//finalViewportViewWidth := lipgloss.Width(newViewportView)
+	//if finalViewportViewWidth == 1234567 {
+	//	return ""
+	//}
 
 	return newViewportView
 }
