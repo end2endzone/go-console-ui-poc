@@ -298,11 +298,25 @@ func ViewportViewWithVerticalScrollBar(vp *viewport.Model, content string) strin
 }
 
 func TestViewportViewWithVerticalScrollBar(t *testing.T) {
-	vp := viewport.New(80, 10)
+	t.Run("Default viewport behavior with border", func(t *testing.T) {
+		vp := viewport.New(80, 10)
+		content := harryPotterBookDescription
 
-	content := harryPotterBookDescription
+		vp.Style = vp.Style.Border(lipgloss.RoundedBorder())
+		vp.SetContent(content)
+
+		// Get the expected bordered view output's width without any scrollbar
+		officialView := vp.View()
+		officialViewWidth := lipgloss.Width(officialView)
+
+		// Assert width of View() output matches the viewport's size
+		require.Equal(t, vp.Width, officialViewWidth)
+	})
 
 	t.Run("No scroll at all", func(t *testing.T) {
+		vp := viewport.New(80, 10)
+		content := harryPotterBookDescription
+
 		// Render the viewport with scrollbar
 		view := ViewportViewWithVerticalScrollBar(&vp, content)
 
@@ -335,10 +349,16 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 	})
 
 	t.Run("Scrolled 3 lines", func(t *testing.T) {
-		vp.ScrollDown(3)
+		vp := viewport.New(80, 10)
+		content := harryPotterBookDescription
 
 		// Render the viewport with scrollbar
 		view := ViewportViewWithVerticalScrollBar(&vp, content)
+
+		vp.ScrollDown(3)
+
+		// (render again)
+		view = ViewportViewWithVerticalScrollBar(&vp, content)
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
 		actualOutput := StripStyles(view)
@@ -369,10 +389,16 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 	})
 
 	t.Run("At the bottom", func(t *testing.T) {
-		vp.GotoBottom()
+		vp := viewport.New(80, 10)
+		content := harryPotterBookDescription
 
 		// Render the viewport with scrollbar
 		view := ViewportViewWithVerticalScrollBar(&vp, content)
+
+		vp.GotoBottom()
+
+		// (render again)
+		view = ViewportViewWithVerticalScrollBar(&vp, content)
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
 		actualOutput := StripStyles(view)
@@ -403,21 +429,19 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 	})
 
 	t.Run("At the top, scrolled 3 lines, with borders", func(t *testing.T) {
-		vp.GotoTop()
-		vp.ScrollDown(3)
+		vp := viewport.New(80, 10)
+		content := harryPotterBookDescription
 
 		vp.Style = vp.Style.Border(lipgloss.RoundedBorder())
 
-		// Get the expected bordered view output's width without any scrollbar
-		officialView := vp.View()
-		officialViewWidth := lipgloss.Width(officialView)
-
-		// Assert width of View() output matches the viewport's size
-		require.Equal(t, vp.Width, officialViewWidth)
-
 		// Render the viewport with scrollbar
-		require.True(t, IsViewportBordered(&vp)) // assert borders before the call
 		view := ViewportViewWithVerticalScrollBar(&vp, content)
+
+		vp.ScrollDown(3)
+
+		// (render again)
+		require.True(t, IsViewportBordered(&vp)) // assert borders before the call
+		view = ViewportViewWithVerticalScrollBar(&vp, content)
 		require.True(t, IsViewportBordered(&vp)) // assert borders after the call
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
