@@ -11,11 +11,12 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 
 	//"charm.land/bubbles/v2/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/end2endzone/go-console-ui-poc/internal/layout"
+	viewportwithverticalscrollbar "github.com/end2endzone/go-console-ui-poc/internal/layout/ViewportWithVerticalScrollBar"
 	"github.com/end2endzone/go-console-ui-poc/internal/layout/navigation"
 )
 
@@ -99,17 +100,15 @@ func NewTheme() Theme {
 }
 
 type model struct {
-	theme           Theme
-	books           []Book
-	filteredBooks   []*Book
-	navigation      navigation.Model
-	table           table.Model
-	viewport        viewport.Model
-	viewportFocused bool
-	searchText      textinput.Model
-	ready           bool
-	layoutTree      *layout.Node
-	panels          struct {
+	theme         Theme
+	books         []Book
+	filteredBooks []*Book
+	navigation    navigation.Model
+	table         table.Model
+	summary       viewportwithverticalscrollbar.Model
+	searchText    textinput.Model
+	layoutTree    *layout.Node
+	panels        struct {
 		searchPanel  *layout.Node
 		booksPanel   *layout.Node
 		summaryPanel *layout.Node
@@ -304,6 +303,7 @@ func initialModel() model {
 		table:      t,
 		searchText: searchText,
 		layoutTree: tree(),
+		summary:    viewportwithverticalscrollbar.NewModel(),
 	}
 
 	// Fill Table
@@ -340,7 +340,7 @@ func initialModel() model {
 func (m *model) ActiveComponent() UIComponent {
 	if m.table.Focused() {
 		return BooksPanelId
-	} else if m.viewportFocused {
+	} else if m.summary.Focused() {
 		return SummaryPanelId
 	} else if m.searchText.Focused() {
 		return SearchPanelId
@@ -354,19 +354,19 @@ func (m *model) FocusComponent(c UIComponent) {
 	switch c {
 	case BooksPanelId:
 		m.table.Focus()
-		m.viewportFocused = false
+		m.summary.Blur()
 		m.searchText.Blur()
 	case SummaryPanelId:
 		m.table.Blur()
-		m.viewportFocused = true
+		m.summary.Focus()
 		m.searchText.Blur()
 	case SearchPanelId:
 		m.table.Blur()
-		m.viewportFocused = false
+		m.summary.Blur()
 		m.searchText.Focus()
 	default:
 		m.table.Blur()
-		m.viewportFocused = false
+		m.summary.Blur()
 		m.searchText.Blur()
 	}
 
@@ -462,12 +462,10 @@ func (m *model) SelectedBook() *Book {
 func (m *model) onSelectedBookChanged() {
 	bookPtr := m.SelectedBook()
 	if bookPtr != nil {
-		description := bookPtr.Description
-		wrappedContent := m.formatViewportContent(description)
-		m.viewport.SetContent(wrappedContent)
+		m.summary.SetContent(bookPtr.Description)
 	} else {
 		// There is no book selected, clear the right panel content
-		m.viewport.SetContent("")
+		m.summary.SetContent("")
 	}
 }
 
@@ -518,83 +516,6 @@ func (m *model) onFilterChanged() {
 		// Refresh the right panel
 		m.onSelectedBookChanged()
 	}
-}
-
-// Wraps text to fit inside the viewport content area.
-// The function shinks text by scrollBarWidth characters to reserve space for the scrollbar string at the end of each line.
-func (m *model) formatViewportContent(text string) string {
-	textWithoutScrollBarWidth := m.viewport.Width - scrollBarWidth
-
-	// Check for minimum length size
-	if textWithoutScrollBarWidth < minViewportTextWidth {
-		textWithoutScrollBarWidth = minViewportTextWidth
-	}
-
-	wrappedContent := lipgloss.NewStyle().Width(textWithoutScrollBarWidth).Render(text)
-
-	return wrappedContent
-}
-
-// Renders the current model's viewport content side-by-side with a vertical dynamic scrollbar.
-func (m *model) renderViewportWithScrollbar() string {
-	// Render viewport content normally.
-
-	// Even if we already called SetContent() to trim the content to 2 characters less than the width of the viewport,
-	// the code from go\pkg\mod\github.com\charmbracelet\lipgloss@v1.1.0\style.go adds padding at the end
-	// of each the strings to match the width of the viewport. See function lipgloss.Style.Render() with the line
-	// `str = alignTextHorizontal(str, horizontalAlign, width, st)`.
-	// To work around this, we temporary shrink the width of the viewport to prevent padding.
-	m.viewport.Width -= scrollBarWidth
-	if m.viewport.Width < 0 {
-		m.viewport.Width = 0
-	}
-	viewportView := m.viewport.View()
-	m.viewport.Width += scrollBarWidth
-
-	// Split by line to be able to manipulate lines individually
-	lines := strings.Split(viewportView, "\n")
-	vpHeight := len(lines) // number of line displayed
-	if vpHeight == 0 {
-		// If viewport content is empty, return immediately
-		return viewportView
-	}
-
-	// Styles for track and scroll handle
-	trackStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	thumbStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Bold(true)
-
-	// Determine scroll thumb position
-	scrollPercent := m.viewport.ScrollPercent()
-	thumbPos := int(scrollPercent * float64(vpHeight-1))
-
-	// Fix thumbPos if we are at the top most or botto mmost viewport
-	if m.viewport.AtBottom() {
-		thumbPos = vpHeight - 1
-	}
-	if m.viewport.AtTop() {
-		thumbPos = 0
-	}
-
-	// Append scrollbar characters at the end of each displayed line
-	var output strings.Builder
-	for i, line := range lines {
-		var scrollChar string
-		if i == thumbPos {
-			scrollChar = thumbStyle.Render("█")
-		} else {
-			scrollChar = trackStyle.Render("│")
-		}
-
-		// Print the line itself and then the scrollbar
-		output.WriteString(fmt.Sprintf("%s %s", line, scrollChar))
-
-		isLast := (i + 1) == len(lines)
-		if !isLast {
-			output.WriteString("\n")
-		}
-	}
-
-	return output.String()
 }
 
 // FilterBooks filters the list of books based on the given filter
@@ -659,8 +580,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		// DEBUG
+		m.width = 149 //msg.Width //results in a summary panel that is 90x11
+		m.height = 13 // msg.Height
 
 		// Resolve panels size based on available space
 		layout.Resolve(m.layoutTree, m.width, m.height-2) // 2 lines for the help string (the help string itself and a final \n)
@@ -669,20 +591,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.SetHeight(tableHeight)
 
 		summaryContentRect := m.panels.summaryPanel.GetInnerRect()
-		summaryViewportWidth := summaryContentRect.W - scrollBarWidth
-
-		if !m.ready {
-			m.viewport = viewport.New(summaryViewportWidth, summaryContentRect.H)
-			m.ready = true
-		} else {
-			m.viewport.Width = summaryViewportWidth
-			m.viewport.Height = summaryContentRect.H
-		}
+		m.summary.SetSize(summaryContentRect.W, summaryContentRect.H)
 
 		// The right viewport dimensions have changed.
 		// Force updating the right viewport with new automatically wrapped content.
 		m.onSelectedBookChanged()
 
+		return m, tea.Batch(cmds...) // Message consumed
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q":
@@ -695,8 +610,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "shift+tab":
 			m.FocusPreviousComponent()
+			return m, tea.Batch(cmds...) // Message consumed
 		case "tab":
 			m.FocusNextComponent()
+			return m, tea.Batch(cmds...) // Message consumed
 
 		case "right", "left":
 			// Quickly change from between left and right panels
@@ -706,6 +623,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case SummaryPanelId:
 				m.FocusComponent(BooksPanelId)
 			}
+			return m, tea.Batch(cmds...) // Message consumed
 		}
 	}
 
@@ -726,10 +644,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.onSelectedBookChanged()
 
 			// And move the right viewport to the top of the view
-			m.viewport.GotoTop()
+			m.summary.GotoTop()
 		}
 	case SummaryPanelId:
-		m.viewport, cmd = m.viewport.Update(msg)
+		m.summary, cmd = m.summary.Update(msg)
 		cmds = append(cmds, cmd)
 	case SearchPanelId:
 		previousFilter := m.searchText.Value()
@@ -751,10 +669,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if !m.ready {
-		return "Initializing UI..."
-	}
-
 	// Get all panels by focus state
 	focusedPanel, unfocusedPanels := m.GetPanelsByFocusState()
 
@@ -780,7 +694,7 @@ func (m model) View() string {
 	// Panel's content
 	m.panels.searchPanel.SetContent(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ") + " " + m.searchText.View())
 	m.panels.booksPanel.SetContent(m.table.View() + "\n\n" + positionIndicatorText)
-	m.panels.summaryPanel.SetContent(m.renderViewportWithScrollbar())
+	m.panels.summaryPanel.SetContent(m.summary.View())
 
 	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
 		"Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",
@@ -793,9 +707,13 @@ func (m model) View() string {
 
 	/*debug := true
 	if debug {
-		dumpToFile("debug/leftColumn.txt", leftColumn)
-		dumpToFile("debug/panels.txt", panels)
-		dumpToFile("debug/body.txt", body)
+		viewCount++
+		debugging.DumpStringToFile(fmt.Sprintf("debug/leftColumn-%d.txt", viewCount), leftColumn)
+		debugging.DumpStringToFile(fmt.Sprintf("debug/panels-%d.txt", viewCount), panels)
+		debugging.DumpStringToFile(fmt.Sprintf("debug/body-%d.txt", viewCount), body)
+
+		debugging.DumpRenderingWithoutStylesToFile("debug/m.summary.View().txt", m.summary.View())
+		debugging.DumpRenderingWithoutStylesToFile("debug/m.panels.summaryPanel.View().txt", m.panels.summaryPanel.View())
 	}*/
 
 	return body

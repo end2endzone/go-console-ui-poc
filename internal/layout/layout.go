@@ -50,7 +50,8 @@ func (n *Node) GetBorderRect() Rect {
 
 func (n *Node) GetInnerRect() Rect {
 	tmp := n.Borders
-	tmp.Shrink(1) // 1 = border thickness
+	tmp.Shrink(1)    // 1 = border thickness
+	tmp.Shrink(0, 1) // 1 = left/right padding
 	return tmp
 }
 
@@ -102,16 +103,48 @@ func (n *Node) SetTitleUsingStyle(title string) {
 }
 
 func (n *Node) View() string {
-	inner := n.GetInnerRect()
-	boxStyle := n.BordersStyle.Width(inner.W).Height(inner.H)
+	if n.Borders.W == 0 || n.Borders.H == 0 {
+		return ""
+	}
+
+	// DEBUG
+	/*inner := n.GetInnerRect()
+	boxStyle := n.BordersStyle.Width(inner.W).Height(inner.H).
+		MaxWidth(inner.W). // truncate anything that it too long
+		MaxHeight(inner.H) // truncate anything that it too high*/
+
+	boxStyle := n.BordersStyle.Width(n.Borders.W).Height(n.Borders.H)
+
+	// DEBUG
+	/*.MaxWidth(n.Borders.W). // truncate anything that it too long
+	MaxHeight(n.Borders.H) // truncate anything that it too high*/
 
 	// Render a normal border if no title is specified
 	if n.Title == "" {
 		return boxStyle.Render(n.Content)
 	}
 
+	// DEBUG
+	/*longest, actualLine := debugging.GetLongestLineInText(n.Content) // DEBUG
+	if longest > 6543 || actualLine == "123456789" {
+		return ""
+	}
+	longest, actualLine = debugging.GetLongestLineInText(debugging.StripStyles(n.Content)) // DEBUG
+	if longest > 6543 || actualLine == "123456789" {
+		return ""
+	}
+	debugging.DumpRenderingWithoutStylesToFile("Node.View().txt", n.Content)*/
+
 	// Render a border with a title otherwise
-	return RenderBorderWithTitle(boxStyle, n.Title, n.TitleStyle, n.Content)
+	s := RenderBorderWithTitle(boxStyle, n.Title, n.TitleStyle, n.Content)
+
+	// DEBUG
+	/*longest, actualLine = debugging.GetLongestLineInText(debugging.StripStyles(s)) // DEBUG
+	if longest > 6543 || actualLine == "123456789" {
+		return ""
+	}*/
+
+	return s
 }
 
 // Rect is a resolved leaf's position and size in terminal cells.
@@ -160,9 +193,11 @@ func (r *Rect) Shrink(n ...int) {
 	h := r.H - top - bottom
 
 	if w < 0 {
+		x = 0
 		w = 0
 	}
 	if h < 0 {
+		y = 0
 		h = 0
 	}
 
