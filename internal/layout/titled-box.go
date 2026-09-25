@@ -13,7 +13,12 @@ import (
 //	╭─Title─────────────────────────────────────────────────────╮
 //	│ ...content...                                             │
 //	╰───────────────────────────────────────────────────────────╯
+//
+// Note that using a style that has a border changes the expected output width and height.
+// A style with a border, a width and a height of 80x24 will result in an output
+// that is 82x26 because the border is rendered around the 80x24 text.
 func RenderBorderWithTitle(boxStyle lipgloss.Style, title string, titleStyle lipgloss.Style, content string) string {
+
 	// Let lipgloss render the box normally but without the top border.
 	bodyStyle := boxStyle.BorderTop(false)
 	body := bodyStyle.Render(content)
@@ -29,6 +34,17 @@ func RenderBorderWithTitle(boxStyle lipgloss.Style, title string, titleStyle lip
 
 // renderTopBorderWithTitle renders just the top border line of a bordered style using a custom the styled title.
 func renderTopBorderWithTitle(boxStyle lipgloss.Style, title string, titleStyle lipgloss.Style, width int) string {
+	// Make the titleStyle safe for a 1 liner title
+	titleStyle = titleStyle.
+		MaxHeight(1).         // force 1 liner output
+		UnsetWidth().         // do not automatically add padding to match a target width
+		UnsetHeight().        // do not automatically add padding to match a target height
+		UnsetBorderTop().     // disable top border
+		UnsetBorderBottom().  // disable bottom border
+		UnsetPaddingTop().    // disable top padding
+		UnsetPaddingBottom(). // disable bottom padding
+		UnsetMargins()        // disable margins
+
 	border := boxStyle.GetBorderStyle()
 
 	// Style for the plain parts of the border (corners + fill runes).
@@ -50,7 +66,7 @@ func renderTopBorderWithTitle(boxStyle lipgloss.Style, title string, titleStyle 
 	if middleWidth < 0 {
 		middleWidth = 0
 	}
-	titleWidth := lipgloss.Width(title) + titleStyle.GetPaddingLeft() + titleStyle.GetPaddingRight()
+	titleWidth := lipgloss.Width(titleStyle.Render(title))
 
 	// Can we render the full title (including its offset position) on the top border?
 	titlePositionOnBorder := 2 // a value of 1 means there's top-left corner, a single `─` character then the title

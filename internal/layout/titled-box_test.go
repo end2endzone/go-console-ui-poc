@@ -1,6 +1,8 @@
 package layout_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
@@ -67,5 +69,86 @@ func TestRenderBorderWithTitle(t *testing.T) {
 		// Assert rendered output
 		err := lipglossutil.AssertViewOutputLines(expectedOutput, actualOutput)
 		require.NoError(t, err)
+	})
+
+	t.Run("Test title with padding style", func(t *testing.T) {
+		boxStyle := lipgloss.NewStyle().
+			Width(40).
+			Height(10).
+			Border(lipgloss.RoundedBorder())
+
+		titleStyle := lipgloss.NewStyle().Padding(2)
+		title := "mytitle"
+		content := loremIpsumDescription
+
+		// Act
+		actualOutput := layout.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
+		actualOutput = lipglossutil.StripStyles(actualOutput)
+
+		expectedOutputFirstLine := "╭──  mytitle  ───────────────────────────╮"
+		actualOutputFirstLine := strings.Split(actualOutput, "\n")[0]
+
+		// Assert rendered output
+		require.Equal(t, expectedOutputFirstLine, actualOutputFirstLine)
+	})
+
+	t.Run("Test title truncate based on size", func(t *testing.T) {
+		baseStyle := lipgloss.NewStyle().
+			Height(10).
+			Border(lipgloss.RoundedBorder())
+
+		titleStyle := lipgloss.NewStyle().Padding(2)
+		title := "mytitle"
+		content := loremIpsumDescription
+
+		type TestCase struct {
+			width          int
+			expectedOutput string
+		}
+		tests := []TestCase{
+			{
+				width:          18,
+				expectedOutput: "╭──  mytitle  ─────╮",
+			},
+			{
+				width:          14,
+				expectedOutput: "╭──  mytitle  ─╮",
+			},
+			{
+				width:          13,
+				expectedOutput: "╭──  mytitle  ╮", // too short truncates the title's trail
+			},
+			{
+				width:          12,
+				expectedOutput: "╭─  mytitle  ╮", // shortening furthur truncates the title's lead
+			},
+			{
+				width:          11,
+				expectedOutput: "╭  mytitle  ╮", // then the title's lead
+			},
+			{
+				width:          10,
+				expectedOutput: "╭  mytitle  ╮", // then the title's lead
+			},
+			{
+				width:          9,
+				expectedOutput: "╭  mytitle ╮", // then the title's lead
+			},
+		}
+
+		for i, tc := range tests {
+			boxStyle := baseStyle.
+				Width(tc.width)
+
+			// Act
+			actualOutput := layout.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
+			actualOutput = lipglossutil.StripStyles(actualOutput)
+
+			actualOutputFirstLine := strings.Split(actualOutput, "\n")[0]
+
+			// Assert rendered output
+			msg := fmt.Sprintf("failure for testcase %d of %d: rendering broder with title using a width of %d has failed", i+1, len(tests), tc.width)
+			require.Equal(t, tc.expectedOutput, actualOutputFirstLine, msg)
+		}
 	})
 }
