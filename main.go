@@ -15,9 +15,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/end2endzone/go-console-ui-poc/internal/layout"
-	viewportwithverticalscrollbar "github.com/end2endzone/go-console-ui-poc/internal/layout/ViewportWithVerticalScrollBar"
-	"github.com/end2endzone/go-console-ui-poc/internal/layout/navigation"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/layout"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/navigation"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/viewportwithverticalscrollbar"
 )
 
 type Book struct {

@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/end2endzone/go-console-ui-poc/internal/lipglossutil"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/lipglossutil"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,4 +1,4 @@
-package layout_test
+package tui_test
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/end2endzone/go-console-ui-poc/internal/layout"
-	"github.com/end2endzone/go-console-ui-poc/internal/lipglossutil"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/lipglossutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +25,7 @@ func TestRenderBorderWithTitle(t *testing.T) {
 		content := loremIpsumDescription
 
 		// Act
-		actualOutput := layout.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
+		actualOutput := tui.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
 		actualOutput = lipglossutil.StripStyles(actualOutput)
 
 		actualOutputWidth := lipgloss.Width(actualOutput)
@@ -82,7 +82,7 @@ func TestRenderBorderWithTitle(t *testing.T) {
 		content := loremIpsumDescription
 
 		// Act
-		actualOutput := layout.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
+		actualOutput := tui.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
 		actualOutput = lipglossutil.StripStyles(actualOutput)
 
 		expectedOutputFirstLine := "╭──  mytitle  ───────────────────────────╮"
@@ -169,7 +169,7 @@ func TestRenderBorderWithTitle(t *testing.T) {
 				Width(tc.width)
 
 			// Act
-			actualOutput := layout.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
+			actualOutput := tui.RenderBorderWithTitle(boxStyle, title, titleStyle, content)
 			actualOutput = lipglossutil.StripStyles(actualOutput)
 
 			actualOutputFirstLine := strings.Split(actualOutput, "\n")[0]

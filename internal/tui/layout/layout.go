@@ -2,6 +2,7 @@ package layout
 
 import (
 	"github.com/charmbracelet/lipgloss"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui"
 )
 
 // NodeType defines how a node's children are splitted: vertically or horizontally.
@@ -136,7 +137,7 @@ func (n *Node) View() string {
 	debugging.DumpRenderingWithoutStylesToFile("Node.View().txt", n.Content)*/
 
 	// Render a border with a title otherwise
-	s := RenderBorderWithTitle(boxStyle, n.Title, n.TitleStyle, n.Content)
+	s := tui.RenderBorderWithTitle(boxStyle, n.Title, n.TitleStyle, n.Content)
 
 	// DEBUG
 	/*longest, actualLine = debugging.GetLongestLineInText(debugging.StripStyles(s)) // DEBUG
