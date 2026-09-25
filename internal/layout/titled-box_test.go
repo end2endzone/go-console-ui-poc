@@ -107,33 +107,61 @@ func TestRenderBorderWithTitle(t *testing.T) {
 		}
 		tests := []TestCase{
 			{
+				width:          25,
+				expectedOutput: "╭──  mytitle  ────────────╮",
+			},
+			{
 				width:          18,
 				expectedOutput: "╭──  mytitle  ─────╮",
 			},
 			{
+				width:          15,
+				expectedOutput: "╭──  mytitle  ──╮", // equal leads and trail
+			},
+			{
 				width:          14,
-				expectedOutput: "╭──  mytitle  ─╮",
+				expectedOutput: "╭──  mytitle  ─╮", // shorten 1 trail
 			},
 			{
 				width:          13,
-				expectedOutput: "╭──  mytitle  ╮", // too short truncates the title's trail
+				expectedOutput: "╭─  mytitle  ─╮", // then shorten 1 lead (to get equals lead/trail)
 			},
 			{
 				width:          12,
-				expectedOutput: "╭─  mytitle  ╮", // shortening furthur truncates the title's lead
+				expectedOutput: "╭─  mytitle  ╮", // shorten 1 trail
 			},
 			{
 				width:          11,
-				expectedOutput: "╭  mytitle  ╮", // then the title's lead
+				expectedOutput: "╭  mytitle  ╮", // shorten 1 lead
 			},
 			{
 				width:          10,
-				expectedOutput: "╭  mytitle  ╮", // then the title's lead
+				expectedOutput: "╭  mytitle ╮", // then the title's trail
 			},
 			{
 				width:          9,
-				expectedOutput: "╭  mytitle ╮", // then the title's lead
+				expectedOutput: "╭ mytitle ╮", // then the title's lead
 			},
+			{
+				width:          8,
+				expectedOutput: "╭ mytitle╮", // then the title's trail
+			},
+			{
+				width:          7,
+				expectedOutput: "╭mytitle╮", // then the title's lead
+			},
+			{
+				width:          6,
+				expectedOutput: "╭mytitl╮", // then we truncathe the actual title's text trail
+			},
+			{
+				width:          1,
+				expectedOutput: "╭m╮", // then we truncate the title's text up to 1 character
+			},
+
+			// Note:
+			// A width of 0 in a style means no target Width() set.
+			// This results in a border that wraps a single line of text making the border ridiculously long.
 		}
 
 		for i, tc := range tests {
