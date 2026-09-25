@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
+	"github.com/end2endzone/go-console-ui-poc/internal/lipglossutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,52 +39,6 @@ type testCase struct {
 	output         []string
 }
 
-// StripStyles removes all ANSI escape sequences from a rendered string
-func StripStyles(renderedView string) string {
-	return string(ansi.Strip(renderedView))
-}
-
-func BoxOutputString(s string, boxSymbol string) string {
-	lines := strings.Split(s, "\n")
-	output := BoxOutputSlices(lines, boxSymbol)
-	return output
-}
-
-func BoxOutputSlices(lines []string, boxSymbol string) string {
-	emptyBox := boxSymbol + boxSymbol + "\n" + boxSymbol + boxSymbol
-	if len(lines) == 0 {
-		return emptyBox
-	}
-	length := GetExpectedOutputBlockWidth(lines)
-	if length == -1 {
-		return emptyBox
-	}
-
-	lines = append([]string(nil), lines...) // duplicate lines to prevent modifying original lines
-
-	for i := range lines {
-		lines[i] = boxSymbol + lines[i] + boxSymbol
-	}
-
-	headerFooter := strings.Repeat(boxSymbol, length+2*lipgloss.Width(boxSymbol))
-
-	lines = append([]string{headerFooter}, lines...) // insert first
-	lines = append(lines, headerFooter)              // insert last
-	body := strings.Join(lines, "\n")
-	return body
-}
-
-func GetExpectedOutputBlockWidth(output []string) int {
-	totalWidth := -1
-	for i := range output {
-		w := lipgloss.Width(output[i])
-		if w > totalWidth {
-			totalWidth = w
-		}
-	}
-	return totalWidth
-}
-
 func runStyleTest(t *testing.T, tc testCase) {
 	t.Run(tc.name, func(t *testing.T) {
 		style := tc.setupStyle()
@@ -92,17 +46,17 @@ func runStyleTest(t *testing.T, tc testCase) {
 		output := style.Render(tc.input)
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
-		output = StripStyles(output)
+		output = lipglossutil.StripStyles(output)
 
 		boxSymbol := "•"
-		boxExpected := BoxOutputSlices(tc.output, boxSymbol)
-		boxActual := BoxOutputString(output, boxSymbol)
+		boxExpected := lipglossutil.BoxOutputSlices(tc.output, boxSymbol)
+		boxActual := lipglossutil.BoxOutputString(output, boxSymbol)
 		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", boxExpected, boxActual)
 
 		lines := strings.Split(output, "\n")
 
 		// Set expected width/height values from the expected output
-		expectedOutputWidth := GetExpectedOutputBlockWidth(tc.output)
+		expectedOutputWidth := lipglossutil.GetExpectedOutputBlockWidth(tc.output)
 
 		// Validate expected width/height values from the expected output
 		require.Equal(t, tc.expectedHeight, len(tc.output), fmt.Sprintf("expected height %d does not match the expected output height %d", tc.expectedHeight, len(tc.output)))

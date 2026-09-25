@@ -1,67 +1,16 @@
 package main_test
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/end2endzone/go-console-ui-poc/internal/lipglossutil"
 	"github.com/stretchr/testify/require"
 )
 
 var harryPotterBookDescription = "Harry Potter and the Philosopher's Stone (published in the United States as Harry Potter and the Sorcerer's Stone) is the fantasy novel that launched the globally acclaimed series by British author J. K. Rowling. The novel introduces Harry Potter, a young boy who discovers on his eleventh birthday that he is an orphaned wizard with a mysterious past, setting the stage for one of the most successful franchises in literary and cinematic history.\n\nRaised by his abusive aunt, uncle, and cousin, Harry has lived a miserable existence sleeping in a cupboard under the stairs. Everything changes when he receives a acceptance letter to Hogwarts School of Witchcraft and Wizardry, delivered by a half-giant named Rubeus Hagrid. Harry learns that his parents were powerful magical figures murdered by the dark wizard Lord Voldemort, and that Harry miraculously survived Voldemort's killing curse as an infant, leaving him with a lightning-bolt scar and legendary status in the wizarding world. At Hogwarts, Harry makes lifelong friends in Ron Weasley and Hermione Granger, and begins his education in magic. However, strange events at the school lead the trio to discover that the Philosopher's Stone—a magical object granting immortality—is hidden within the castle and under threat. Believing a hostile professor is attempting to steal it for the weakened Voldemort, Harry and his friends navigate a series of deadly magical obstacles to protect the stone, confronting the true agent of evil in a dramatic final showdown."
-
-func GetLipglossWidthFromLines(lines []string) int {
-	width := 0
-	for i := range lines {
-		w := lipgloss.Width(lines[i])
-		if w > width {
-			width = w
-		}
-	}
-	return width
-}
-
-func GetLipglossHeightFromLines(lines []string) int {
-	height := len(lines)
-	return height
-}
-
-func AssertViewOutputString(expected string, actual string) error {
-	lines := strings.Split(expected, "\n")
-	err := AssertViewOutputLines(lines, actual)
-	return err
-}
-
-func AssertViewOutputLines(expectedLines []string, actual string) error {
-	actualLines := strings.Split(actual, "\n")
-
-	expectedWidth := GetLipglossWidthFromLines(expectedLines)
-	actualWidth := GetLipglossWidthFromLines(actualLines)
-
-	expectedHeight := GetLipglossHeightFromLines(expectedLines)
-	actualHeight := GetLipglossHeightFromLines(actualLines)
-
-	if expectedWidth != actualWidth {
-		return fmt.Errorf("expectedWidth != actualWidth, expecting %d, got %d", expectedWidth, actualWidth)
-	}
-	if expectedHeight != actualHeight {
-		return fmt.Errorf("expectedHeight != actualHeight, expecting %d, got %d", expectedHeight, actualHeight)
-	}
-
-	// compare line by line
-	for i := range actualLines {
-		expectedLine := expectedLines[i]
-		actualLine := actualLines[i]
-		if expectedLine != actualLine {
-			return fmt.Errorf("line %d, expectedLine != actualLine, expecting `%s`, got `%s`", i, expectedLine, actualLine)
-		}
-	}
-
-	return nil
-}
 
 func TestViewportBehavior(t *testing.T) {
 	/*
@@ -104,7 +53,7 @@ func TestViewportBehavior(t *testing.T) {
 	view := vp.View()
 
 	// Strip ANSI colors/styles so we can perform reliable structural string assertions
-	actualOutput := StripStyles(view)
+	actualOutput := lipglossutil.StripStyles(view)
 
 	expectedOutput := []string{
 		"globally acclaimed series by British author J. K. Rowling. The novel introduces ",
@@ -120,181 +69,12 @@ func TestViewportBehavior(t *testing.T) {
 	}
 
 	boxSymbol := "•"
-	actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
-	expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+	actualOutputBoxed := lipglossutil.BoxOutputString(actualOutput, boxSymbol)
+	expectedOutputBoxed := lipglossutil.BoxOutputSlices(expectedOutput, boxSymbol)
 	t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
 
-	err := AssertViewOutputLines(expectedOutput, actualOutput)
+	err := lipglossutil.AssertViewOutputLines(expectedOutput, actualOutput)
 	require.NoError(t, err)
-}
-
-func IsViewportBordered(vp *viewport.Model) bool {
-	if vp.Style.GetBorderTop() ||
-		vp.Style.GetBorderBottom() ||
-		vp.Style.GetBorderLeft() ||
-		vp.Style.GetBorderRight() {
-		return true
-	}
-	return false
-}
-
-func ViewportViewWithVerticalScrollBar(vp *viewport.Model, content string) string {
-	if vp.Width == 0 || vp.Height == 0 {
-		return ""
-	}
-
-	// Backup the viewport's
-	previousStyle := vp.Style
-	previousBorder := vp.Style.GetBorderStyle()
-	previousWidth := vp.Width
-	previousHeight := vp.Height
-	bordered := IsViewportBordered(vp)
-
-	const borderWidth = 1 // actual width of each side of the border
-
-	// Remember that we need to render the inside text smaller to account for final border to match the viewport's original width.
-	borderWidthIfPresent := 0
-	borderHeightIfPresent := 0
-
-	// Remove the borders from the viewport's style
-	if bordered {
-		// Reduce the size of the viewport to be able to add a border at a later time.
-		if vp.Style.GetBorderTop() {
-			vp.Height -= borderWidth
-			borderHeightIfPresent++
-		}
-		if vp.Style.GetBorderBottom() {
-			vp.Height -= borderWidth
-			borderHeightIfPresent++
-		}
-		if vp.Style.GetBorderLeft() {
-			vp.Width -= borderWidth
-			borderWidthIfPresent++
-		}
-		if vp.Style.GetBorderRight() {
-			vp.Width -= borderWidth
-			borderWidthIfPresent++
-		}
-		if vp.Height < 0 {
-			vp.Height = 0
-		}
-		if vp.Width < 0 {
-			vp.Width = 0
-		}
-
-		// Remove the border
-		vp.Style = vp.Style.UnsetBorderStyle()
-	}
-
-	// Restore the original style and size at the end
-	defer func() {
-		if bordered {
-			vp.Width = previousWidth
-			vp.Height = previousHeight
-			vp.Style = previousStyle
-		}
-	}()
-
-	ThumbSymbol := "█"
-	TrackSymbol := "|"
-	scrollBarWidth := 1 + max(lipgloss.Width(ThumbSymbol), lipgloss.Width(TrackSymbol)) // a space then the symbol
-
-	ThumbStyle := lipgloss.NewStyle().Foreground(lipgloss.ANSIColor(8)).Bold(true)
-	TrackStyle := lipgloss.NewStyle().Foreground(lipgloss.ANSIColor(8))
-
-	// Explicitly wrap the text to the viewport's target width - scrollBarWidth to add the right scrollbar.
-	// Note: Do not set a specific height to limit the rendered output to a maximum of lines.
-	// When rendering smaller/shorter content, the rendering process will add empty rows.
-	// Sending these empty rows to the viewport will make them actually scrollable which is undesired.
-	wrappedText := lipgloss.NewStyle().
-		Width(vp.Width - scrollBarWidth).
-		Render(content)
-
-	// Set the pre-wrapped multi-line text into the viewport
-	//before := vp.ScrollPercent()
-	//if before == 123.4567 {
-	//	return ""
-	//}
-	vp.SetContent(wrappedText)
-	//after := vp.ScrollPercent()
-	//if after == 123.4567 {
-	//	return ""
-	//}
-
-	// Temporary patch the viewport's width to match the content style's width.
-	// Without this, the viewport will add additionnal padding at the end of each row to match its width.
-	// Then render the View().
-	vp.Width -= scrollBarWidth
-	tmpViewportView := vp.View()
-	vp.Width += scrollBarWidth
-
-	//tmpViewportViewWidth := lipgloss.Width(tmpViewportView)
-	//if tmpViewportViewWidth == 1234567 {
-	//	return ""
-	//}
-
-	// Split by line to be able to manipulate lines individually
-	lines := strings.Split(tmpViewportView, "\n")
-	vpHeight := len(lines) // number of line displayed
-	if vpHeight == 0 {
-		// If viewport content is empty, return immediately
-		return tmpViewportView
-	}
-
-	// Determine scroll thumb position
-	scrollPercent := vp.ScrollPercent()
-	thumbPos := int(scrollPercent * float64(vpHeight-1))
-
-	// Fix thumbPos if we are at the top most or botto mmost viewport
-	if vp.AtBottom() {
-		thumbPos = vpHeight - 1
-	}
-	if vp.AtTop() {
-		thumbPos = 0
-	}
-
-	// Append scrollbar characters at the end of each displayed line
-	var output strings.Builder
-	for i, line := range lines {
-		var scrollSymbol string
-		if i == thumbPos {
-			scrollSymbol = ThumbStyle.Render(ThumbSymbol)
-		} else {
-			scrollSymbol = TrackStyle.Render(TrackSymbol)
-		}
-
-		// Print the line itself and then the scrollbar
-		output.WriteString(fmt.Sprintf("%s %s", line, scrollSymbol))
-
-		isLast := (i + 1) == len(lines)
-		if !isLast {
-			output.WriteString("\n")
-		}
-	}
-
-	newViewportView := output.String()
-	//newViewportViewWidth := lipgloss.Width(newViewportView)
-	//if newViewportViewWidth == 1234567 {
-	//	return ""
-	//}
-
-	// Add a border if the original viewport was bordered
-	if bordered {
-		style := vp.Style.
-			Border(previousBorder).
-			Width(vp.Width).
-			Height(vp.Height)
-
-		// Add a border around previously rendered text
-		newViewportView = style.Render(newViewportView)
-	}
-
-	//finalViewportViewWidth := lipgloss.Width(newViewportView)
-	//if finalViewportViewWidth == 1234567 {
-	//	return ""
-	//}
-
-	return newViewportView
 }
 
 func TestViewportViewWithVerticalScrollBar(t *testing.T) {
@@ -318,10 +98,10 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		content := harryPotterBookDescription
 
 		// Render the viewport with scrollbar
-		view := ViewportViewWithVerticalScrollBar(&vp, content)
+		view := lipglossutil.ViewportViewWithVerticalScrollBar(&vp, content)
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
-		actualOutput := StripStyles(view)
+		actualOutput := lipglossutil.StripStyles(view)
 
 		expectedOutput := []string{
 			"Harry Potter and the Philosopher's Stone (published in the United States as    █",
@@ -337,14 +117,14 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		}
 
 		boxSymbol := "•"
-		actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
-		expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+		actualOutputBoxed := lipglossutil.BoxOutputString(actualOutput, boxSymbol)
+		expectedOutputBoxed := lipglossutil.BoxOutputSlices(expectedOutput, boxSymbol)
 		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
 
 		// Assert width of View() output matches the viewport's size
 		require.Equal(t, vp.Width, lipgloss.Width(actualOutput))
 
-		err := AssertViewOutputLines(expectedOutput, actualOutput)
+		err := lipglossutil.AssertViewOutputLines(expectedOutput, actualOutput)
 		require.NoError(t, err)
 	})
 
@@ -353,15 +133,15 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		content := harryPotterBookDescription
 
 		// Render the viewport with scrollbar
-		view := ViewportViewWithVerticalScrollBar(&vp, content)
+		view := lipglossutil.ViewportViewWithVerticalScrollBar(&vp, content)
 
 		vp.ScrollDown(3)
 
 		// (render again)
-		view = ViewportViewWithVerticalScrollBar(&vp, content)
+		view = lipglossutil.ViewportViewWithVerticalScrollBar(&vp, content)
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
-		actualOutput := StripStyles(view)
+		actualOutput := lipglossutil.StripStyles(view)
 
 		expectedOutput := []string{
 			"introduces Harry Potter, a young boy who discovers on his eleventh birthday    |",
@@ -377,14 +157,14 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		}
 
 		boxSymbol := "•"
-		actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
-		expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+		actualOutputBoxed := lipglossutil.BoxOutputString(actualOutput, boxSymbol)
+		expectedOutputBoxed := lipglossutil.BoxOutputSlices(expectedOutput, boxSymbol)
 		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
 
 		// Assert width of View() output matches the viewport's size
 		require.Equal(t, vp.Width, lipgloss.Width(actualOutput))
 
-		err := AssertViewOutputLines(expectedOutput, actualOutput)
+		err := lipglossutil.AssertViewOutputLines(expectedOutput, actualOutput)
 		require.NoError(t, err)
 	})
 
@@ -393,15 +173,15 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		content := harryPotterBookDescription
 
 		// Render the viewport with scrollbar
-		view := ViewportViewWithVerticalScrollBar(&vp, content)
+		view := lipglossutil.ViewportViewWithVerticalScrollBar(&vp, content)
 
 		vp.GotoBottom()
 
 		// (render again)
-		view = ViewportViewWithVerticalScrollBar(&vp, content)
+		view = lipglossutil.ViewportViewWithVerticalScrollBar(&vp, content)
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
-		actualOutput := StripStyles(view)
+		actualOutput := lipglossutil.StripStyles(view)
 
 		expectedOutput := []string{
 			"were powerful magical figures murdered by the dark wizard Lord Voldemort, and  |",
@@ -417,14 +197,14 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		}
 
 		boxSymbol := "•"
-		actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
-		expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+		actualOutputBoxed := lipglossutil.BoxOutputString(actualOutput, boxSymbol)
+		expectedOutputBoxed := lipglossutil.BoxOutputSlices(expectedOutput, boxSymbol)
 		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
 
 		// Assert width of View() output matches the viewport's size
 		require.Equal(t, vp.Width, lipgloss.Width(actualOutput))
 
-		err := AssertViewOutputLines(expectedOutput, actualOutput)
+		err := lipglossutil.AssertViewOutputLines(expectedOutput, actualOutput)
 		require.NoError(t, err)
 	})
 
@@ -435,17 +215,17 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		vp.Style = vp.Style.Border(lipgloss.RoundedBorder())
 
 		// Render the viewport with scrollbar
-		view := ViewportViewWithVerticalScrollBar(&vp, content)
+		view := lipglossutil.ViewportViewWithVerticalScrollBar(&vp, content)
 
 		vp.ScrollDown(3)
 
 		// (render again)
-		require.True(t, IsViewportBordered(&vp)) // assert borders before the call
-		view = ViewportViewWithVerticalScrollBar(&vp, content)
-		require.True(t, IsViewportBordered(&vp)) // assert borders after the call
+		require.True(t, lipglossutil.IsViewportBordered(&vp)) // assert borders before the call
+		view = lipglossutil.ViewportViewWithVerticalScrollBar(&vp, content)
+		require.True(t, lipglossutil.IsViewportBordered(&vp)) // assert borders after the call
 
 		// Strip ANSI colors/styles so we can perform reliable structural string assertions
-		actualOutput := StripStyles(view)
+		actualOutput := lipglossutil.StripStyles(view)
 
 		expectedOutput := []string{
 			"╭──────────────────────────────────────────────────────────────────────────────╮",
@@ -461,14 +241,14 @@ func TestViewportViewWithVerticalScrollBar(t *testing.T) {
 		}
 
 		boxSymbol := "•"
-		actualOutputBoxed := BoxOutputString(actualOutput, boxSymbol)
-		expectedOutputBoxed := BoxOutputSlices(expectedOutput, boxSymbol)
+		actualOutputBoxed := lipglossutil.BoxOutputString(actualOutput, boxSymbol)
+		expectedOutputBoxed := lipglossutil.BoxOutputSlices(expectedOutput, boxSymbol)
 		t.Logf("\nExpected test output:\n%s\n\nActual test output:\n%s", expectedOutputBoxed, actualOutputBoxed)
 
 		// Assert width of View() output matches the viewport's size
 		require.Equal(t, vp.Width, lipgloss.Width(actualOutput))
 
-		err := AssertViewOutputLines(expectedOutput, actualOutput)
+		err := lipglossutil.AssertViewOutputLines(expectedOutput, actualOutput)
 		require.NoError(t, err)
 	})
 
