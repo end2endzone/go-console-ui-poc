@@ -13,10 +13,10 @@ const (
 	ColumnNode                 // ColumnNode arranges children top-to-bottom, splitting available height.
 )
 
-// SizeSpec defines a node's requirement specifications.
+// Policy defines a node's requirement specifications.
 // It controls how a node's size is computed along its parent's split axis.
 // Leave everything to default value to "just grow evenly with an equal weight".
-type SizeSpec struct {
+type Policy struct {
 	Fixed int // exact size on the split axis. A value of 0 means unspecified.
 	Min   int // clamp: minimum size on the split axis. A value of 0 means no minimum.
 	Max   int // clamp: maximum size on the split axis. A value of 0 means no maximum.
@@ -25,15 +25,15 @@ type SizeSpec struct {
 
 // Node is one element of the layout tree: either a leaf (a panel designed to render into) or a parent/container (rows/columns) with children.
 type Node struct {
-	Name     string   // required on leaves you want to look up after Resolve
-	Size     SizeSpec // sizing on the parent's split axis; ignored on the root
-	NodeType NodeType
-	Children []*Node
+	Name      string // required on leaves you want to look up after Resolve
+	Policy    Policy // sizing on the parent's split axis; ignored on the root
+	Dimension Rect   // dimensions of the node. Matches the panel's borders if the panel has a bordered style.
+	NodeType  NodeType
+	Children  []*Node
 
 	// Render properties
 	Title        string // title displayed on the border. Can be empty to render a normal border
 	TitleStyle   lipgloss.Style
-	Borders      Rect // dimensions of the panel. Matches the panel's borders if the panel as a bordered style.
 	BordersStyle lipgloss.Style
 	Content      string
 }
@@ -46,11 +46,11 @@ func (n *Node) IsLeaf() bool {
 }
 
 func (n *Node) GetBorderRect() Rect {
-	return n.Borders
+	return n.Dimension
 }
 
 func (n *Node) GetInnerRect() Rect {
-	tmp := n.Borders
+	tmp := n.Dimension
 	tmp.Shrink(1)    // 1 = border thickness
 	tmp.Shrink(0, 1) // 1 = left/right padding
 	return tmp
@@ -104,7 +104,7 @@ func (n *Node) SetTitleUsingStyle(title string) {
 }
 
 func (n *Node) View() string {
-	if n.Borders.W == 0 || n.Borders.H == 0 {
+	if n.Dimension.W == 0 || n.Dimension.H == 0 {
 		return ""
 	}
 
@@ -114,7 +114,7 @@ func (n *Node) View() string {
 		MaxWidth(inner.W). // truncate anything that it too long
 		MaxHeight(inner.H) // truncate anything that it too high*/
 
-	boxStyle := n.BordersStyle.Width(n.Borders.W).Height(n.Borders.H)
+	boxStyle := n.BordersStyle.Width(n.Dimension.W).Height(n.Dimension.H)
 
 	// DEBUG
 	/*.MaxWidth(n.Borders.W). // truncate anything that it too long
@@ -217,28 +217,28 @@ func (r *Rect) Reset() {
 
 // Row creates a container whose children are arranged side-by-side, splitting the width.
 // size controls how wide this node is relative to its own siblings (ignored if this is the tree root).
-func Row(size SizeSpec, children ...*Node) *Node {
-	return &Node{Size: size, NodeType: RowNode, Children: children}
+func Row(size Policy, children ...*Node) *Node {
+	return &Node{Policy: size, NodeType: RowNode, Children: children}
 }
 
 // Col creates a container whose children are stacked top-to-bottom, splitting the height.
 // size controls how tall this node is relative to its own siblings (ignored if this is the tree root).
-func Col(size SizeSpec, children ...*Node) *Node {
-	return &Node{Size: size, NodeType: ColumnNode, Children: children}
+func Col(size Policy, children ...*Node) *Node {
+	return &Node{Policy: size, NodeType: ColumnNode, Children: children}
 }
 
-func RowWithName(name string, size SizeSpec, children ...*Node) *Node {
-	return &Node{Name: name, Size: size, NodeType: RowNode, Children: children}
+func RowWithName(name string, size Policy, children ...*Node) *Node {
+	return &Node{Name: name, Policy: size, NodeType: RowNode, Children: children}
 }
 
-func ColWithName(name string, size SizeSpec, children ...*Node) *Node {
-	return &Node{Name: name, Size: size, NodeType: ColumnNode, Children: children}
+func ColWithName(name string, size Policy, children ...*Node) *Node {
+	return &Node{Name: name, Policy: size, NodeType: ColumnNode, Children: children}
 }
 
 // Leaf creates a panel.
 // name must be unique across the tree if you intend to use this name for look ups in the final Rect map.
-func Leaf(name string, size SizeSpec) *Node {
-	return &Node{Name: name, Size: size}
+func Leaf(name string, size Policy) *Node {
+	return &Node{Name: name, Policy: size}
 }
 
 // Resolve walks the tree and computes the Rect of every named node for the given terminal width/height.
@@ -248,11 +248,11 @@ func Resolve(root *Node, width int, height int) {
 }
 
 func resolve(n *Node, x, y, w, h int) {
-	n.Borders.Reset()
+	n.Dimension.Reset()
 
 	if n.IsLeaf() {
 		// Node is a leaf, assign the full remaining size to this node
-		n.Borders = Rect{X: x, Y: y, W: w, H: h}
+		n.Dimension = Rect{X: x, Y: y, W: w, H: h}
 	}
 
 	switch n.NodeType {
@@ -285,12 +285,12 @@ func distribute(children []*Node, total int) []int {
 	var growIdxs []int
 	growTotal := 0
 	for i, c := range children {
-		if c.Size.Fixed > 0 {
-			sz := clamp(c.Size.Fixed, c.Size.Min, c.Size.Max)
+		if c.Policy.Fixed > 0 {
+			sz := clamp(c.Policy.Fixed, c.Policy.Min, c.Policy.Max)
 			sizes[i] = sz
 			remaining -= sz
 		} else {
-			g := c.Size.Grow
+			g := c.Policy.Grow
 			if g <= 0 {
 				g = 1
 			}
@@ -305,7 +305,7 @@ func distribute(children []*Node, total int) []int {
 	distributed := 0
 	for j, i := range growIdxs {
 		c := children[i]
-		g := c.Size.Grow
+		g := c.Policy.Grow
 		if g <= 0 {
 			g = 1
 		}
@@ -315,7 +315,7 @@ func distribute(children []*Node, total int) []int {
 		} else {
 			sz = remaining * g / growTotal
 		}
-		sz = clamp(sz, c.Size.Min, c.Size.Max)
+		sz = clamp(sz, c.Policy.Min, c.Policy.Max)
 		sizes[i] = sz
 		distributed += sz
 	}

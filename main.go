@@ -266,12 +266,12 @@ func hasBookChanged(before *Book, after *Book) bool {
 
 // tree describes the layout of the panels.
 func tree() *layout.Node {
-	return layout.Row(layout.SizeSpec{}, // root's own Size is ignored
-		layout.ColWithName(LeftColumnName, layout.SizeSpec{Fixed: 40}, // column 1: fixed 40 cols wide
-			layout.Leaf(BooksPanelName, layout.SizeSpec{Grow: 1, Min: minContentHeight}), // fills remaining height, minimum height 9
-			layout.Leaf(SearchPanelName, layout.SizeSpec{Fixed: 3}),                      // fixed height
+	return layout.Row(layout.Policy{}, // root's own Size is ignored
+		layout.ColWithName(LeftColumnName, layout.Policy{Fixed: 40}, // column 1: fixed 40 cols wide
+			layout.Leaf(BooksPanelName, layout.Policy{Grow: 1, Min: minContentHeight}), // fills remaining height, minimum height 9
+			layout.Leaf(SearchPanelName, layout.Policy{Fixed: 3}),                      // fixed height
 		),
-		layout.Leaf(SummaryPanelName, layout.SizeSpec{Grow: 1}), // column 2: fills remaining width
+		layout.Leaf(SummaryPanelName, layout.Policy{Grow: 1}), // column 2: fills remaining width
 	)
 }
 
@@ -313,7 +313,7 @@ func initialModel() model {
 	// Set left panels width based on this.
 	tableWidth := getTableColumnsWidth(&m.table)
 	tableWidth += 4 // +2 for padding (1 on each side), +2 borders
-	m.layoutTree.Find(LeftColumnName).Size.Fixed = tableWidth
+	m.layoutTree.Find(LeftColumnName).Policy.Fixed = tableWidth
 
 	// Pre-find the leaf panels
 	m.panels.searchPanel = m.layoutTree.Find(SearchPanelName)
@@ -587,7 +587,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Resolve panels size based on available space
 		layout.Resolve(m.layoutTree, m.width, m.height-2) // 2 lines for the help string (the help string itself and a final \n)
 
-		tableHeight := m.panels.booksPanel.Borders.H - 2*borderWidth - 2 // 2 lines cursor indicator footer
+		tableHeight := m.panels.booksPanel.Dimension.H - 2*borderWidth - 2 // 2 lines cursor indicator footer
 		m.table.SetHeight(tableHeight)
 
 		summaryContentRect := m.panels.summaryPanel.GetInnerRect()
