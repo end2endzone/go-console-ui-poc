@@ -15,9 +15,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/components/titledborderedpanels"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/components/titledborderedpanels/textpanel"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/components/titledborderedpanels/textpanelwithscrollbar"
 	"github.com/end2endzone/go-console-ui-poc/internal/tui/layout"
 	"github.com/end2endzone/go-console-ui-poc/internal/tui/navigation"
-	"github.com/end2endzone/go-console-ui-poc/internal/tui/viewportwithverticalscrollbar"
 )
 
 type Book struct {
@@ -105,13 +107,17 @@ type model struct {
 	filteredBooks []*Book
 	navigation    navigation.Model
 	table         table.Model
-	summary       viewportwithverticalscrollbar.Model
 	searchText    textinput.Model
 	layoutTree    *layout.Node
 	panels        struct {
-		searchPanel  *layout.Node
-		booksPanel   *layout.Node
-		summaryPanel *layout.Node
+		books   textpanel.Model
+		search  textpanel.Model
+		summary textpanelwithscrollbar.Model
+	}
+	nodes struct {
+		search  *layout.Node
+		books   *layout.Node
+		summary *layout.Node
 	}
 	width  int
 	height int
@@ -303,7 +309,6 @@ func initialModel() model {
 		table:      t,
 		searchText: searchText,
 		layoutTree: tree(),
-		summary:    viewportwithverticalscrollbar.NewModel(),
 	}
 
 	// Fill Table
@@ -316,14 +321,18 @@ func initialModel() model {
 	m.layoutTree.Find(LeftColumnName).Policy.Fixed = tableWidth
 
 	// Pre-find the leaf panels
-	m.panels.searchPanel = m.layoutTree.Find(SearchPanelName)
-	m.panels.booksPanel = m.layoutTree.Find(BooksPanelName)
-	m.panels.summaryPanel = m.layoutTree.Find(SummaryPanelName)
+	m.nodes.search = m.layoutTree.Find(SearchPanelName)
+	m.nodes.books = m.layoutTree.Find(BooksPanelName)
+	m.nodes.summary = m.layoutTree.Find(SummaryPanelName)
 
-	// Set panel's titles
-	m.panels.searchPanel.Title = "Search"
-	m.panels.booksPanel.Title = "Books"
-	m.panels.summaryPanel.Title = "Summary"
+	// Set panel's and their titles
+	m.panels.books = textpanel.New()
+	m.panels.search = textpanel.New()
+	m.panels.summary = textpanelwithscrollbar.New()
+
+	m.panels.books.Title = "Books"
+	m.panels.search.Title = "Search"
+	m.panels.summary.Title = "Summary"
 
 	// Setup navigation panels
 	m.navigation.IDs = []int{int(BooksPanelId), int(SearchPanelId), int(SummaryPanelId)}
@@ -340,7 +349,7 @@ func initialModel() model {
 func (m *model) ActiveComponent() UIComponent {
 	if m.table.Focused() {
 		return BooksPanelId
-	} else if m.summary.Focused() {
+	} else if m.panels.summary.Focused() {
 		return SummaryPanelId
 	} else if m.searchText.Focused() {
 		return SearchPanelId
@@ -354,19 +363,19 @@ func (m *model) FocusComponent(c UIComponent) {
 	switch c {
 	case BooksPanelId:
 		m.table.Focus()
-		m.summary.Blur()
+		m.panels.summary.Blur()
 		m.searchText.Blur()
 	case SummaryPanelId:
 		m.table.Blur()
-		m.summary.Focus()
+		m.panels.summary.Focus()
 		m.searchText.Blur()
 	case SearchPanelId:
 		m.table.Blur()
-		m.summary.Blur()
+		m.panels.summary.Blur()
 		m.searchText.Focus()
 	default:
 		m.table.Blur()
-		m.summary.Blur()
+		m.panels.summary.Blur()
 		m.searchText.Blur()
 	}
 
@@ -393,39 +402,39 @@ func (m *model) FocusPreviousComponent() {
 }
 
 // GetPanels returns the list of all panels in the model
-func (m *model) GetPanels() []*layout.Node {
-	return []*layout.Node{
-		m.panels.booksPanel,
-		m.panels.searchPanel,
-		m.panels.summaryPanel,
+func (m *model) GetPanels() []titledborderedpanels.TitledBorderedPanel {
+	return []titledborderedpanels.TitledBorderedPanel{
+		&m.panels.books,
+		&m.panels.search,
+		&m.panels.summary,
 	}
 }
 
 // GetFocusedPanel returns the panels that contains the currently focused component
-func (m *model) GetPanelsByFocusState() (focusedPanel *layout.Node, unfocusedPanels []*layout.Node) {
+func (m *model) GetPanelsByFocusState() (focusedPanel titledborderedpanels.TitledBorderedPanel, unfocusedPanels []titledborderedpanels.TitledBorderedPanel) {
 	// Get current component
 	activeComponent := m.ActiveComponent()
 
 	switch activeComponent {
 	case BooksPanelId:
-		focusedPanel = m.panels.booksPanel
-		unfocusedPanels = []*layout.Node{
-			m.panels.searchPanel,
-			m.panels.summaryPanel,
+		focusedPanel = &m.panels.books
+		unfocusedPanels = []titledborderedpanels.TitledBorderedPanel{
+			&m.panels.search,
+			&m.panels.summary,
 		}
 		return
 	case SummaryPanelId:
-		focusedPanel = m.panels.summaryPanel
-		unfocusedPanels = []*layout.Node{
-			m.panels.booksPanel,
-			m.panels.searchPanel,
+		focusedPanel = &m.panels.summary
+		unfocusedPanels = []titledborderedpanels.TitledBorderedPanel{
+			&m.panels.books,
+			&m.panels.search,
 		}
 		return
 	case SearchPanelId:
-		focusedPanel = m.panels.searchPanel
-		unfocusedPanels = []*layout.Node{
-			m.panels.booksPanel,
-			m.panels.summaryPanel,
+		focusedPanel = &m.panels.search
+		unfocusedPanels = []titledborderedpanels.TitledBorderedPanel{
+			&m.panels.books,
+			&m.panels.summary,
 		}
 		return
 	default:
@@ -435,14 +444,14 @@ func (m *model) GetPanelsByFocusState() (focusedPanel *layout.Node, unfocusedPan
 
 // GetPanelFromId gets the matching panel given a panel id.
 // Returns nil if the panel id is unknown.
-func (m *model) GetPanelFromId(id UIComponent) *layout.Node {
+func (m *model) GetPanelFromId(id UIComponent) titledborderedpanels.TitledBorderedPanel {
 	switch id {
 	case SearchPanelId:
-		return m.panels.searchPanel
+		return &m.panels.search
 	case BooksPanelId:
-		return m.panels.booksPanel
+		return &m.panels.books
 	case SummaryPanelId:
-		return m.panels.summaryPanel
+		return &m.panels.summary
 	}
 	return nil
 }
@@ -462,10 +471,10 @@ func (m *model) SelectedBook() *Book {
 func (m *model) onSelectedBookChanged() {
 	bookPtr := m.SelectedBook()
 	if bookPtr != nil {
-		m.summary.SetContent(bookPtr.Description)
+		m.panels.summary.SetContent(bookPtr.Description)
 	} else {
 		// There is no book selected, clear the right panel content
-		m.summary.SetContent("")
+		m.panels.summary.SetContent("")
 	}
 }
 
@@ -580,18 +589,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		// DEBUG
-		m.width = 149 //msg.Width //results in a summary panel that is 90x11
-		m.height = 13 // msg.Height
+		m.width = msg.Width //results in a summary panel that is 90x11
+		m.height = msg.Height
 
 		// Resolve panels size based on available space
 		layout.Resolve(m.layoutTree, m.width, m.height-2) // 2 lines for the help string (the help string itself and a final \n)
 
-		tableHeight := m.panels.booksPanel.Dimension.H - 2*borderWidth - 2 // 2 lines cursor indicator footer
+		tableHeight := m.nodes.books.Dimension.H - 2*borderWidth - 2 // 2 lines cursor indicator footer
 		m.table.SetHeight(tableHeight)
 
-		summaryContentRect := m.panels.summaryPanel.GetInnerRect()
-		m.summary.SetSize(summaryContentRect.W, summaryContentRect.H)
+		// Copy resolved node sizes to their matching panels
+		m.panels.books.SetSize(
+			m.nodes.books.Dimension.W,
+			m.nodes.books.Dimension.H,
+		)
+		m.panels.search.SetSize(
+			m.nodes.search.Dimension.W,
+			m.nodes.search.Dimension.H,
+		)
+		m.panels.summary.SetSize(
+			m.nodes.summary.Dimension.W,
+			m.nodes.summary.Dimension.H,
+		)
 
 		// The right viewport dimensions have changed.
 		// Force updating the right viewport with new automatically wrapped content.
@@ -644,10 +663,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.onSelectedBookChanged()
 
 			// And move the right viewport to the top of the view
-			m.summary.GotoTop()
+			m.panels.summary.GotoTop()
 		}
 	case SummaryPanelId:
-		m.summary, cmd = m.summary.Update(msg)
+		abstractModel, cmd := m.panels.summary.Update(msg)
+		summaryModel, ok := abstractModel.(*textpanelwithscrollbar.Model)
+		if ok {
+			m.panels.summary = *summaryModel
+		} else {
+			panic("Interface update returned an unexpected underlying type")
+		}
 		cmds = append(cmds, cmd)
 	case SearchPanelId:
 		previousFilter := m.searchText.Value()
@@ -673,17 +698,17 @@ func (m model) View() string {
 	focusedPanel, unfocusedPanels := m.GetPanelsByFocusState()
 
 	// handle focus panel
-	focusedPanel.BordersStyle = m.theme.FocusedPanel.BorderStyle
-	focusedPanel.TitleStyle = m.theme.FocusedPanel.TitleStyle
+	focusedPanel.SetPanelStyle(m.theme.FocusedPanel.BorderStyle)
+	focusedPanel.SetTitleStyle(m.theme.FocusedPanel.TitleStyle)
 
 	// handle unfocused panels
 	for _, p := range unfocusedPanels {
-		p.BordersStyle = m.theme.UnfocusedPanel.BorderStyle
-		p.TitleStyle = m.theme.UnfocusedPanel.TitleStyle
+		p.SetPanelStyle(m.theme.UnfocusedPanel.BorderStyle)
+		p.SetTitleStyle(m.theme.UnfocusedPanel.TitleStyle)
 	}
 
 	// Update the books table styles based on focused panel
-	if m.panels.booksPanel == focusedPanel {
+	if &m.panels.books == focusedPanel {
 		m.table.SetStyles(m.theme.FocusedPanel.BooksTableStyles)
 	} else {
 		m.table.SetStyles(m.theme.UnfocusedPanel.BooksTableStyles)
@@ -692,17 +717,17 @@ func (m model) View() string {
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
 
 	// Panel's content
-	m.panels.searchPanel.SetContent(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ") + " " + m.searchText.View())
-	m.panels.booksPanel.SetContent(m.table.View() + "\n\n" + positionIndicatorText)
-	m.panels.summaryPanel.SetContent(m.summary.View())
+	m.panels.search.SetContent(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ") + " " + m.searchText.View())
+	m.panels.books.SetContent(m.table.View() + "\n" + positionIndicatorText)
+	// summary panel is already updated in onSelectedBookChanged()
 
 	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
 		"Tab/←/→: Switch Active Panel  |  ↑/↓: Scroll  |  q: Quit",
 	)
 
 	// Join all panels
-	leftColumn := lipgloss.JoinVertical(lipgloss.Left, m.panels.booksPanel.View(), m.panels.searchPanel.View())
-	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summaryPanel.View())
+	leftColumn := lipgloss.JoinVertical(lipgloss.Left, m.panels.books.View(), m.panels.search.View())
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summary.View())
 	body := panels + "\n" + help
 
 	/*debug := true
@@ -712,7 +737,7 @@ func (m model) View() string {
 		debugging.DumpStringToFile(fmt.Sprintf("debug/panels-%d.txt", viewCount), panels)
 		debugging.DumpStringToFile(fmt.Sprintf("debug/body-%d.txt", viewCount), body)
 
-		debugging.DumpRenderingWithoutStylesToFile("debug/m.summary.View().txt", m.summary.View())
+		debugging.DumpRenderingWithoutStylesToFile("debug/m.panels.summary.View().txt", m.panels.summary.View())
 		debugging.DumpRenderingWithoutStylesToFile("debug/m.panels.summaryPanel.View().txt", m.panels.summaryPanel.View())
 	}*/
 

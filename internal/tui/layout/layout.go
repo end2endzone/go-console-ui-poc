@@ -1,10 +1,5 @@
 package layout
 
-import (
-	"github.com/charmbracelet/lipgloss"
-	"github.com/end2endzone/go-console-ui-poc/internal/tui"
-)
-
 // NodeType defines how a node's children are splitted: vertically or horizontally.
 type NodeType int
 
@@ -30,12 +25,6 @@ type Node struct {
 	Dimension Rect   // dimensions of the node. Matches the panel's borders if the panel has a bordered style.
 	NodeType  NodeType
 	Children  []*Node
-
-	// Render properties
-	Title        string // title displayed on the border. Can be empty to render a normal border
-	TitleStyle   lipgloss.Style
-	BordersStyle lipgloss.Style
-	Content      string
 }
 
 func (n *Node) IsLeaf() bool {
@@ -43,25 +32,6 @@ func (n *Node) IsLeaf() bool {
 		return true
 	}
 	return false
-}
-
-func (n *Node) GetBorderRect() Rect {
-	return n.Dimension
-}
-
-func (n *Node) GetInnerRect() Rect {
-	tmp := n.Dimension
-	tmp.Shrink(1)    // 1 = border thickness
-	tmp.Shrink(0, 1) // 1 = left/right padding
-	return tmp
-}
-
-func (n *Node) SetContent(content string) {
-	n.Content = content
-}
-
-func (n *Node) SetStyle(style lipgloss.Style) {
-	n.BordersStyle = style
 }
 
 // Find looks up a Node by its name iteratively. The function is non-recusrive.
@@ -91,61 +61,6 @@ func (root *Node) Find(name string) *Node {
 	}
 
 	return nil
-}
-
-// SetTitleUsingStyle sets the node's titles as rendered text using the current style colors of the node.
-func (n *Node) SetTitleUsingStyle(title string) {
-	borderForegroundColor := n.BordersStyle.GetBorderTopForeground()
-	borderBackgroundColor := n.BordersStyle.GetBorderTopBackground()
-	style := lipgloss.NewStyle().
-		Foreground(borderForegroundColor).
-		Background(borderBackgroundColor)
-	n.Title = style.Render(title)
-}
-
-func (n *Node) View() string {
-	if n.Dimension.W == 0 || n.Dimension.H == 0 {
-		return ""
-	}
-
-	// DEBUG
-	/*inner := n.GetInnerRect()
-	boxStyle := n.BordersStyle.Width(inner.W).Height(inner.H).
-		MaxWidth(inner.W). // truncate anything that it too long
-		MaxHeight(inner.H) // truncate anything that it too high*/
-
-	boxStyle := n.BordersStyle.Width(n.Dimension.W).Height(n.Dimension.H)
-
-	// DEBUG
-	/*.MaxWidth(n.Borders.W). // truncate anything that it too long
-	MaxHeight(n.Borders.H) // truncate anything that it too high*/
-
-	// Render a normal border if no title is specified
-	if n.Title == "" {
-		return boxStyle.Render(n.Content)
-	}
-
-	// DEBUG
-	/*longest, actualLine := debugging.GetLongestLineInText(n.Content) // DEBUG
-	if longest > 6543 || actualLine == "123456789" {
-		return ""
-	}
-	longest, actualLine = debugging.GetLongestLineInText(debugging.StripStyles(n.Content)) // DEBUG
-	if longest > 6543 || actualLine == "123456789" {
-		return ""
-	}
-	debugging.DumpRenderingWithoutStylesToFile("Node.View().txt", n.Content)*/
-
-	// Render a border with a title otherwise
-	s := tui.RenderBorderWithTitle(boxStyle, n.Title, n.TitleStyle, n.Content)
-
-	// DEBUG
-	/*longest, actualLine = debugging.GetLongestLineInText(debugging.StripStyles(s)) // DEBUG
-	if longest > 6543 || actualLine == "123456789" {
-		return ""
-	}*/
-
-	return s
 }
 
 // Rect is a resolved leaf's position and size in terminal cells.
