@@ -3,6 +3,8 @@ package debugging
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -17,6 +19,35 @@ func DumpStringToFile(filename string, data string) {
 		err2 := fmt.Errorf("Failed to dump debug string to file: %v", err)
 		panic(err2)
 	}
+}
+
+// AppendStringToFile appends a debug string to the given file path.
+func AppendStringToFile(filename string, data string) {
+	// 0644 gives read/write permissions to the owner, and read-only to others
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	// Write the string to the file
+	if _, err := file.WriteString(data); err != nil {
+		panic(err)
+	}
+}
+
+// GetCurrentLocation returns the file name and line number of where it was called.
+func GetCurrentLocation() string {
+	// skip = 1 looks at the function calling getCurrentLocation
+	_, file, line, ok := runtime.Caller(1)
+	if !ok {
+		return "unknown:0"
+	}
+
+	// Optional: Use filepath.Base to get "main.go" instead of the full absolute path
+	shortFile := filepath.Base(file)
+
+	return fmt.Sprintf("%s:%d", shortFile, line)
 }
 
 func RenderAllColors() string {
