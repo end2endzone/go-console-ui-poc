@@ -730,17 +730,6 @@ func (m model) View() string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.panels.summary.View())
 	body := panels + "\n" + help
 
-	/*debug := true
-	if debug {
-		viewCount++
-		debugging.DumpStringToFile(fmt.Sprintf("debug/leftColumn-%d.txt", viewCount), leftColumn)
-		debugging.DumpStringToFile(fmt.Sprintf("debug/panels-%d.txt", viewCount), panels)
-		debugging.DumpStringToFile(fmt.Sprintf("debug/body-%d.txt", viewCount), body)
-
-		debugging.DumpRenderingWithoutStylesToFile("debug/m.panels.summary.View().txt", m.panels.summary.View())
-		debugging.DumpRenderingWithoutStylesToFile("debug/m.panels.summaryPanel.View().txt", m.panels.summaryPanel.View())
-	}*/
-
 	return body
 }
 
