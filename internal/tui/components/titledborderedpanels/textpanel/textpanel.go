@@ -111,11 +111,46 @@ func (m *Model) SetTitleStyle(style lipgloss.Style) {
 
 func (m *Model) SetPanelStyle(style lipgloss.Style) {
 	m.PanelStyle = style
+
+	// Update the internal viewport
+	m.UpdateViewport()
 }
 
 func (m *Model) GetMinimumSize() (width int, height int) {
 	width = 2 * borderWidth
 	height = 2 * borderWidth
+	return
+}
+
+func (m *Model) GetMaximumContentSize() (width int, height int) {
+	if m.width == 0 || m.height == 0 {
+		return 0, 0
+	}
+
+	// The viewport's matches the panel if the panel's style is border is unset.
+	width = m.width
+	height = m.height
+
+	// Account for any internal borders
+	if m.PanelStyle.GetBorderLeft() {
+		width--
+	}
+	if m.PanelStyle.GetBorderRight() {
+		width--
+	}
+	if m.PanelStyle.GetBorderTop() {
+		height--
+	}
+	if m.PanelStyle.GetBorderBottom() {
+		height--
+	}
+
+	// Account for any internal padding
+	width -= m.PanelStyle.GetPaddingLeft()
+	width -= m.PanelStyle.GetPaddingRight()
+	height -= m.PanelStyle.GetPaddingTop()
+	height -= m.PanelStyle.GetPaddingBottom()
+
 	return
 }
 
@@ -146,13 +181,12 @@ func (m *Model) SetContent(content string) {
 
 // UpdateViewport is called by the parent to resize the viewport and update its content
 func (m *Model) UpdateViewport() {
-	// Account for any internal padding or borders the child has
-	m.viewport.Width = m.width - 2*borderWidth
-	m.viewport.Height = m.height - 2*borderWidth
+	m.viewport.Width, m.viewport.Height = m.GetMaximumContentSize()
 
 	// Wrap the text to the viewport's specific width so it
 	// knows exactly how many vertical lines are being rendered.
 	wrappedText := lipgloss.NewStyle().Width(m.viewport.Width).Render(m.content)
+
 	m.viewport.SetContent(wrappedText)
 }
 

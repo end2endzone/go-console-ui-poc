@@ -18,6 +18,7 @@ type TitledBorderedPanel interface {
 	SetPanelStyle(style lipgloss.Style)
 	SetSize(width int, height int)
 	GetMinimumSize() (width int, height int)
+	GetMaximumContentSize() (width int, height int)
 	SetContent(content string)
 
 	// Bubble tea.Model interface
