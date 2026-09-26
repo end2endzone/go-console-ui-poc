@@ -338,6 +338,12 @@ func initialModel() model {
 	m.navigation.IDs = []int{int(BooksPanelId), int(SearchPanelId), int(SummaryPanelId)}
 	m.navigation.SetFocusedComponentByValue(int(BooksPanelId))
 
+	// Set a default style for all panels
+	// Fixes the "unable to scroll to bottom" issue.
+	m.panels.books.SetPanelStyle(m.theme.UnfocusedPanel.BorderStyle)
+	m.panels.search.SetPanelStyle(m.theme.UnfocusedPanel.BorderStyle)
+	m.panels.summary.SetPanelStyle(m.theme.UnfocusedPanel.BorderStyle)
+
 	// Focus books by default
 	activeComponent := UIComponent(m.navigation.CurrentFocusedComponent())
 	m.FocusComponent(activeComponent)
