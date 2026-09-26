@@ -521,6 +521,9 @@ func (m *model) onFilterChanged() {
 					panic(err)
 				}
 			}
+		} else {
+			// The old book is not found with the new search filter. Select the first book available.
+			m.table.GotoTop()
 		}
 
 		// Force the right panel to update for one of the following reasons:
@@ -723,7 +726,7 @@ func (m model) View() string {
 	positionIndicatorText := fmt.Sprintf("[%d/%d]", m.table.Cursor()+1, len(m.table.Rows()))
 
 	// Panel's content
-	m.panels.search.SetContent(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("Search: ") + " " + m.searchText.View())
+	m.panels.search.SetContent(m.searchText.View())
 	m.panels.books.SetContent(m.table.View() + "\n" + positionIndicatorText)
 	// summary panel is already updated in onSelectedBookChanged()
 
