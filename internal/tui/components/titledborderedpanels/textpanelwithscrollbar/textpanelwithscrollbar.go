@@ -8,10 +8,14 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/end2endzone/go-console-ui-poc/internal/tui"
+	"github.com/end2endzone/go-console-ui-poc/internal/tui/components/titledborderedpanels"
 	"github.com/end2endzone/go-console-ui-poc/internal/tui/lipglossutil"
 )
 
 const borderWidth = 1
+
+// Force Model to always implements interface titledborderedpanels.TitledBorderedPanel
+var _ titledborderedpanels.TitledBorderedPanel = (*Model)(nil)
 
 type Model struct {
 	Title      string
@@ -101,7 +105,19 @@ func (m *Model) PageDown() []string {
 // Other
 /////////////////////////////////////
 
-func (m *Model) GetMinimumPanelSize() (width int, height int) {
+func (m *Model) SetTitle(title string) {
+	m.Title = title
+}
+
+func (m *Model) SetTitleStyle(style lipgloss.Style) {
+	m.TitleStyle = style
+}
+
+func (m *Model) SetPanelStyle(style lipgloss.Style) {
+	m.PanelStyle = style
+}
+
+func (m *Model) GetMinimumSize() (width int, height int) {
 	width = 2*borderWidth + m.ScrollBar.Width()
 	height = 2 * borderWidth
 	return
@@ -112,7 +128,7 @@ func (m *Model) SetSize(width int, height int) {
 	m.width = width
 	m.height = height
 
-	minWidth, minHeight := m.GetMinimumPanelSize()
+	minWidth, minHeight := m.GetMinimumSize()
 	if m.width < minWidth {
 		m.width = minWidth
 	}
@@ -152,11 +168,11 @@ func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (titledborderedpanels.TitledBorderedPanel, tea.Cmd) {
 	var cmd tea.Cmd
 	// Forward keys/mouse messages to the viewport
 	m.viewport, cmd = m.viewport.Update(msg)
-	return *m, cmd
+	return m, cmd
 }
 
 func (m *Model) View() string {
